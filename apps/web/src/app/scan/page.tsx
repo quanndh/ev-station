@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, Loader2 } from "lucide-react";
 import { BrowserQRCodeReader } from "@zxing/browser";
 
 import { navigateAfterQrScan } from "@/lib/qrScanNavigate";
@@ -20,6 +20,8 @@ export default function ScanPage() {
   const [manual, setManual] = useState("");
   const [running, setRunning] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
+  /** Camera đã đọc QR, đang điều hướng / xử lý URL. */
+  const [cameraProcessing, setCameraProcessing] = useState(false);
   const [imageDecodeError, setImageDecodeError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -57,9 +59,12 @@ export default function ScanPage() {
               const text = result?.getText?.();
               if (!text || navigatedRef.current) return;
               navigatedRef.current = true;
-              void navigateAfterQrScan(text).then((ok) => {
-                if (!ok) navigatedRef.current = false;
-              });
+              setCameraProcessing(true);
+              void navigateAfterQrScan(text)
+                .then((ok) => {
+                  if (!ok) navigatedRef.current = false;
+                })
+                .finally(() => setCameraProcessing(false));
             },
           );
 
@@ -89,9 +94,12 @@ export default function ScanPage() {
             const first = codes?.[0]?.rawValue;
             if (first && !navigatedRef.current) {
               navigatedRef.current = true;
-              void navigateAfterQrScan(first).then((ok) => {
-                if (!ok) navigatedRef.current = false;
-              });
+              setCameraProcessing(true);
+              void navigateAfterQrScan(first)
+                .then((ok) => {
+                  if (!ok) navigatedRef.current = false;
+                })
+                .finally(() => setCameraProcessing(false));
               return;
             }
           } catch {
@@ -109,6 +117,7 @@ export default function ScanPage() {
 
     return () => {
       setRunning(false);
+      setCameraProcessing(false);
       if (raf) window.cancelAnimationFrame(raf);
       if (stopZxing) stopZxing();
       if (stream) stream.getTracks().forEach((t) => t.stop());
@@ -145,6 +154,8 @@ export default function ScanPage() {
     }
   }, []);
 
+  const qrWorking = imageBusy || cameraProcessing;
+
   return (
     <BlobBackground>
       <SiteHeader />
@@ -159,13 +170,29 @@ export default function ScanPage() {
                 trên QR).
               </CardMuted>
 
-              <div className="mt-5 overflow-hidden rounded-[2rem] border border-[color:var(--border)]/60 bg-[color:var(--muted)]/40">
+              <div className="relative mt-5 overflow-hidden rounded-[2rem] border border-[color:var(--border)]/60 bg-[color:var(--muted)]/40">
                 <video
                   ref={videoRef}
                   className="h-[320px] w-full object-cover"
                   playsInline
                   muted
                 />
+                {qrWorking ? (
+                  <div
+                    className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[color:var(--background)]/75 backdrop-blur-[2px]"
+                    role="status"
+                    aria-live="polite"
+                    aria-busy="true"
+                  >
+                    <Loader2
+                      className="h-10 w-10 animate-spin text-[color:var(--primary)]"
+                      aria-hidden
+                    />
+                    <span className="text-sm font-semibold text-[color:var(--foreground)]">
+                      {imageBusy ? "Đang đọc QR từ ảnh…" : "Đã quét QR — đang xử lý…"}
+                    </span>
+                  </div>
+                ) : null}
               </div>
 
               <input
