@@ -8,9 +8,8 @@ import { Container } from "@/components/ui/container";
 import { APP_BRAND_NAME } from "@/lib/appBrand";
 
 const STORAGE_SNOOZE_UNTIL = "evgs_pwa_install_snooze_until";
+/** Trễ ngắn để trang ổn định; hiển thị cùng tốc độ dù đã có `beforeinstallprompt` hay chưa. */
 const SHOW_DELAY_MS = 2200;
-/** Chờ thêm nếu `beforeinstallprompt` tới trễ — vẫn hiện dải banner ở đầu body. */
-const INSTALL_BANNER_FALLBACK_EXTRA_MS = 5500;
 const SNOOZE_MS = 30 * 24 * 60 * 60 * 1000;
 
 const DEBUG_PUBLIC = process.env.NEXT_PUBLIC_DEBUG_PWA_BANNER === "true";
@@ -56,7 +55,6 @@ export function InstallPwaBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [forceBanner, setForceBanner] = useState(false);
   const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hideForMonth = useCallback(() => {
     writeSnoozeOneMonth();
@@ -130,30 +128,13 @@ export function InstallPwaBanner() {
     }
 
     if (showTimerRef.current) clearTimeout(showTimerRef.current);
-    if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
 
-    if (forceBanner) {
-      showTimerRef.current = setTimeout(tryShow, 600);
-      return () => {
-        if (showTimerRef.current) clearTimeout(showTimerRef.current);
-      };
-    }
-
-    if (deferredPrompt) {
-      showTimerRef.current = setTimeout(tryShow, SHOW_DELAY_MS);
-      return () => {
-        if (showTimerRef.current) clearTimeout(showTimerRef.current);
-      };
-    }
-
-    fallbackTimerRef.current = setTimeout(
-      tryShow,
-      SHOW_DELAY_MS + INSTALL_BANNER_FALLBACK_EXTRA_MS,
-    );
+    const delay = forceBanner ? 600 : SHOW_DELAY_MS;
+    showTimerRef.current = setTimeout(tryShow, delay);
     return () => {
-      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+      if (showTimerRef.current) clearTimeout(showTimerRef.current);
     };
-  }, [deferredPrompt, forceBanner, tryShow]);
+  }, [forceBanner, tryShow]);
 
   async function onInstallClick() {
     if (!deferredPrompt) return;
