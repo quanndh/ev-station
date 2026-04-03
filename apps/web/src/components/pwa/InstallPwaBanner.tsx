@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 
 import { LogoMark } from "@/components/brand/LogoMark";
@@ -49,11 +49,22 @@ function writeSnoozeOneMonth() {
   }
 }
 
+/** Mọi trình duyệt trên iPhone (kể cả Chrome) đều WebKit — không có `beforeinstallprompt`. */
+function isLikelyIos(): boolean {
+  if (typeof navigator === "undefined") return false;
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) return true;
+  if (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) return true;
+  return false;
+}
+
 export function InstallPwaBanner() {
   const [open, setOpen] = useState(false);
   const [entered, setEntered] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [forceBanner, setForceBanner] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+  const [iosStepsOpen, setIosStepsOpen] = useState(false);
+  const iosStepsRef = useRef<HTMLDivElement>(null);
   const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hideForMonth = useCallback(() => {
@@ -74,10 +85,18 @@ export function InstallPwaBanner() {
     setOpen(true);
   }, [forceBanner]);
 
+  useLayoutEffect(() => {
+    setIsIos(isLikelyIos());
+  }, []);
+
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     if (DEBUG_PUBLIC || sp.get("pwaBanner") === "1") setForceBanner(true);
   }, []);
+
+  useEffect(() => {
+    if (open) setIosStepsOpen(false);
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -137,17 +156,26 @@ export function InstallPwaBanner() {
   }, [forceBanner, tryShow]);
 
   async function onInstallClick() {
-    if (!deferredPrompt) return;
-    const dp = deferredPrompt;
-    setDeferredPrompt(null);
-    setEntered(false);
-    setOpen(false);
-    await dp.prompt();
+    if (deferredPrompt) {
+      const dp = deferredPrompt;
+      setDeferredPrompt(null);
+      setEntered(false);
+      setOpen(false);
+      await dp.prompt();
+      return;
+    }
+    if (isIos) {
+      setIosStepsOpen(true);
+      requestAnimationFrame(() => {
+        iosStepsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+    }
   }
 
   if (!open) return null;
 
   const canNativeInstall = !!deferredPrompt;
+  const installEnabled = canNativeInstall || isIos;
 
   return (
     <div
@@ -180,16 +208,17 @@ export function InstallPwaBanner() {
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <button
               type="button"
-              disabled={!canNativeInstall}
+              disabled={!installEnabled}
+              aria-expanded={isIos ? iosStepsOpen : undefined}
               title={
-                canNativeInstall
+                installEnabled
                   ? undefined
-                  : "Đợi trình duyệt sẵn sàng — sẽ mở cửa sổ Cài đặt của Chrome/Edge"
+                  : "Trình duyệt desktop: đợi Chrome bật lựa chọn cài ứng dụng"
               }
               onClick={() => void onInstallClick()}
               className={[
                 "whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-bold shadow-sm transition active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm",
-                canNativeInstall
+                installEnabled
                   ? "bg-white text-[color:var(--primary)] hover:bg-white/95"
                   : "cursor-not-allowed bg-white/35 text-white/80",
               ].join(" ")}
@@ -206,10 +235,36 @@ export function InstallPwaBanner() {
             </button>
           </div>
         </div>
+        {isIos && iosStepsOpen ? (
+          <div
+            ref={iosStepsRef}
+            className="mt-2 border-t border-white/25 pt-2 text-[11px] leading-snug text-white/90 sm:text-xs"
+          >
+            <p className="font-semibold text-white">Trên iPhone (kể cả Chrome)</p>
+            <p className="mt-1">
+              Apple không cho phép hộp thoại “Cài đặt” như trên Android. Bạn cần thêm trang vào Màn hình chính
+              thủ công:
+            </p>
+            <ol className="mt-2 list-decimal space-y-1 pl-4 marker:text-white/90">
+              <li>
+                Chạm <strong className="text-white">Chia sẻ</strong>{" "}
+                <span className="whitespace-nowrap">(ô vuông + mũi tên lên)</span> ở thanh dưới Safari, hoặc menu{" "}
+                <strong className="text-white">Chia sẻ</strong> trong Chrome.
+              </li>
+              <li>
+                Cuộn xuống và chọn <strong className="text-white">Thêm vào Màn hình chính</strong>.
+              </li>
+            </ol>
+            <p className="mt-2 text-white/80">
+              Nếu Chrome không có mục đó, hãy mở cùng địa chỉ trong <strong className="text-white">Safari</strong> rồi
+              làm hai bước trên.
+            </p>
+          </div>
+        ) : null}
         {forceBanner ? (
           <p className="mt-2 border-t border-white/20 pt-2 text-[10px] text-white/70">
-            Thử: <code className="rounded bg-black/15 px-1">?pwaBanner=1</code> — nút chỉ bật khi có{" "}
-            <code className="rounded bg-black/15 px-1">beforeinstallprompt</code> (HTTPS, đủ điều kiện PWA).
+            Thử: <code className="rounded bg-black/15 px-1">?pwaBanner=1</code> — trên Android / Chrome máy tính nút mở{" "}
+            <code className="rounded bg-black/15 px-1">beforeinstallprompt</code>; trên iPhone không có (WebKit).
           </p>
         ) : null}
         </div>
