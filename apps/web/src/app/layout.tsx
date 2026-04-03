@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Fraunces, Nunito } from "next/font/google";
+
+import { APP_BRAND_NAME } from "@/lib/appBrand";
 import "./globals.css";
 
-const appName =
-  process.env.NEXT_PUBLIC_APP_DISPLAY_NAME?.trim() || "EV Green Station";
+const appName = APP_BRAND_NAME;
 
 const heading = Fraunces({
   variable: "--font-heading",
@@ -25,6 +26,10 @@ export const metadata: Metadata = {
   description:
     "Trạm sạc xe điện — quét QR, bắt đầu sạc, thanh toán sau phiên.",
   applicationName: appName,
+  icons: {
+    icon: "/brand/logo-mark.svg",
+    apple: "/brand/logo-mark.svg",
+  },
 };
 
 export default function RootLayout({

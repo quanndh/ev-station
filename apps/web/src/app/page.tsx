@@ -53,8 +53,8 @@ export default function Home() {
               </li>
             </ol>
 
-            <div className="mt-8 flex flex-col items-center gap-6 sm:flex-row sm:flex-wrap sm:justify-center">
-              <Link href="/scan" className="text-center">
+            <div className="mt-8 flex justify-center text-center">
+              <Link href="/scan">
                 <div className="inline-flex flex-col items-center gap-3">
                   <span
                     className={[
@@ -73,16 +73,22 @@ export default function Home() {
                   </div>
                 </div>
               </Link>
-              <Link href="/qr-test">
-                <Button type="button" variant="outline" size="lg">
-                  Tạo QR và poster in trạm
-                </Button>
-              </Link>
             </div>
 
             <p className="mt-5 text-sm text-[color:var(--muted-foreground)]">
               Lưu ý: hiện hỗ trợ 1 connector/trạm và thanh toán xác nhận thủ
               công.
+            </p>
+          </div>
+
+          <div className="mt-8 flex flex-col items-center gap-2 sm:mt-10">
+            <Link href="/qr-test">
+              <Button type="button" variant="outline" size="lg">
+                Tạo QR và poster in trạm
+              </Button>
+            </Link>
+            <p className="max-w-md text-center text-xs text-[color:var(--muted-foreground)]">
+              Dành cho chủ trạm: tạo mã QR và ảnh poster để in, dán tại trụ sạc.
             </p>
           </div>
         </Container>

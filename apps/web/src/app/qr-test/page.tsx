@@ -13,14 +13,12 @@ import {
   demoStationAbsoluteUrl,
   resolvedDemoStationSlug,
 } from "@/lib/demoDefaults";
+import { APP_BRAND_NAME } from "@/lib/appBrand";
 import {
   downloadBlob,
   generateStationQrPosterBlob,
   slugFromStationQrUrl,
 } from "@/lib/generateStationQrPoster";
-
-const APP_DISPLAY_NAME =
-  process.env.NEXT_PUBLIC_APP_DISPLAY_NAME?.trim() || "EV Green Station";
 
 function initialDemoQrUrl(): string {
   const base =
@@ -109,7 +107,7 @@ export default function QrTestPage() {
                     try {
                       const blob = await generateStationQrPosterBlob({
                         url: normalized || url,
-                        appName: APP_DISPLAY_NAME,
+                        appName: APP_BRAND_NAME,
                         stationName: stationLabel.trim() || `Trạm · ${demoSlug}`,
                         widthPx: 1800,
                       });

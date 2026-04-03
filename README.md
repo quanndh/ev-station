@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/readme-banner.svg" alt="EV Green Station — nền tảng quản lý trạm sạc" width="100%" />
+<img src="apps/web/public/brand/logo-mark.svg" alt="EV Green Station — nền tảng quản lý trạm sạc" width="100%" />
 
 <br/>
 

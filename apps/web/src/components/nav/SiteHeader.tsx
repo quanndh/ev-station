@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { LogoMark } from "@/components/brand/LogoMark";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
+import { APP_BRAND_NAME } from "@/lib/appBrand";
 import { clearToken, getTokenEmail, getTokenRole } from "@/lib/authClient";
 import { useDrawer } from "@/components/shell/DrawerContext";
 import { Menu } from "lucide-react";
@@ -40,14 +42,12 @@ export function SiteHeader() {
             ) : null}
           <Link
             href={logoHref}
-            className="flex items-center gap-2 rounded-full px-3 py-2"
-            aria-label="EV Green Station"
+            className="flex min-w-0 items-center gap-2 rounded-full px-2 py-1 sm:px-3 sm:py-2"
+            aria-label={APP_BRAND_NAME}
           >
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-[color:var(--primary)] text-[color:var(--primary-foreground)] shadow-[var(--shadow-soft)]">
-              EV
-            </span>
-            <span className="font-serif text-base sm:text-lg font-bold tracking-tight">
-              Green Station
+            <LogoMark className="h-8 w-8 sm:h-9 sm:w-9" />
+            <span className="truncate font-serif text-base font-bold tracking-tight text-[color:var(--foreground)] sm:text-lg">
+              {APP_BRAND_NAME}
             </span>
           </Link>
           </div>
