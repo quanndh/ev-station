@@ -145,12 +145,13 @@ ev-station/
 
 > **Gợi ý:** Thêm ảnh chụp màn hình thật vào `docs/screenshots/` (ví dụ `home.png`, `scan.png`, `session.png`) và chèn vào đây:
 
-```markdown
-![Trang chủ](docs/screenshots/home.png)
-![Quét QR](docs/screenshots/scan.png)
-```
+<p align="center">
+  <img src="docs/screenshoots/home.jpg" alt="Trang chủ EV Green Station" width="480" />
+</p>
 
-Banner phía trên (`docs/readme-banner.svg`) có thể chỉnh màu / chữ trực tiếp trong file SVG cho đồng bộ thương hiệu.
+<p align="center">
+  <img src="docs/screenshoots/scan.jpg" alt="Quét QR" width="480" />
+</p>
 
 ---
 
