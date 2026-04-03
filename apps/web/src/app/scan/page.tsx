@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ImagePlus } from "lucide-react";
 import { BrowserQRCodeReader } from "@zxing/browser";
 
 import { navigateAfterQrScan } from "@/lib/qrScanNavigate";
@@ -18,6 +19,9 @@ export default function ScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [manual, setManual] = useState("");
   const [running, setRunning] = useState(false);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imageDecodeError, setImageDecodeError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const secureContextHint = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -111,6 +115,36 @@ export default function ScanPage() {
     };
   }, [supportsBarcodeDetector]);
 
+  const onGalleryImageChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file?.type.startsWith("image/")) return;
+
+    setImageDecodeError(null);
+    setImageBusy(true);
+    const blobUrl = URL.createObjectURL(file);
+    try {
+      const reader = new BrowserQRCodeReader();
+      const result = await reader.decodeFromImageUrl(blobUrl);
+      const text = result.getText();
+      if (!text) {
+        setImageDecodeError("Không đọc được nội dung QR.");
+        return;
+      }
+      if (navigatedRef.current) return;
+      navigatedRef.current = true;
+      const ok = await navigateAfterQrScan(text);
+      if (!ok) navigatedRef.current = false;
+    } catch {
+      setImageDecodeError(
+        "Không tìm thấy QR trong ảnh. Chọn ảnh rõ hơn, hoặc dán link ở cột bên phải.",
+      );
+    } finally {
+      URL.revokeObjectURL(blobUrl);
+      setImageBusy(false);
+    }
+  }, []);
+
   return (
     <BlobBackground>
       <SiteHeader />
@@ -133,6 +167,32 @@ export default function ScanPage() {
                   muted
                 />
               </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(ev) => void onGalleryImageChange(ev)}
+              />
+              <div className="mt-3 flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5 px-4 text-xs"
+                  disabled={imageBusy}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <ImagePlus className="h-4 w-4 shrink-0" aria-hidden />
+                  Ảnh từ thư viện
+                </Button>
+              </div>
+              {imageDecodeError ? (
+                <div className="mt-2 text-center text-xs text-[color:var(--destructive)]">
+                  {imageDecodeError}
+                </div>
+              ) : null}
 
               <div className="mt-4 text-sm text-[color:var(--muted-foreground)]">
                 {supportsBarcodeDetector

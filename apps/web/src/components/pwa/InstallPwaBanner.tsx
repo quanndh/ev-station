@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
 
 import { LogoMark } from "@/components/brand/LogoMark";
-import { Button } from "@/components/ui/button";
-import { APP_BRAND_NAME, APP_BRAND_SHORT_NAME } from "@/lib/appBrand";
+import { APP_BRAND_NAME } from "@/lib/appBrand";
 
 const STORAGE_SNOOZE_UNTIL = "evgs_pwa_install_snooze_until";
 const SHOW_DELAY_MS = 2200;
@@ -63,6 +63,7 @@ export function InstallPwaBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isIos, setIsIos] = useState(false);
   const [forceBanner, setForceBanner] = useState(false);
+  const [fallbackInstallHint, setFallbackInstallHint] = useState(false);
   const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -83,6 +84,10 @@ export function InstallPwaBanner() {
     setEntered(false);
     setOpen(true);
   }, [forceBanner]);
+
+  useEffect(() => {
+    if (open) setFallbackInstallHint(false);
+  }, [open]);
 
   useLayoutEffect(() => {
     setIsIos(isLikelyIos());
@@ -180,13 +185,23 @@ export function InstallPwaBanner() {
     window.setTimeout(() => setOpen(false), 280);
   }
 
+  function onPrimaryInstallClick() {
+    if (deferredPrompt) {
+      void onInstallClick();
+      return;
+    }
+    setFallbackInstallHint(true);
+  }
+
   if (!open) return null;
 
   const showManualNonIos = !deferredPrompt && !isIos;
+  const showIosHelp = Boolean(isIos && !deferredPrompt && fallbackInstallHint);
+  const showChromeHelp = Boolean(showManualNonIos && fallbackInstallHint);
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 top-0 z-[95] flex justify-center px-3 pt-[max(0.75rem,env(safe-area-inset-top))]"
+      className="pointer-events-none fixed inset-x-0 top-0 z-[100] flex justify-center px-3 pt-[max(0.25rem,env(safe-area-inset-top))]"
       aria-hidden={!entered}
     >
       <div
@@ -194,49 +209,58 @@ export function InstallPwaBanner() {
         aria-modal="false"
         aria-labelledby="pwa-install-title"
         className={[
-          "pointer-events-auto w-full max-w-lg rounded-b-[var(--radius-card-lg)] border border-[color:var(--border)]/80",
-          "bg-[color:var(--background)] px-4 pb-4 pt-3 shadow-[var(--shadow-float)] transition-transform duration-300 ease-out",
-          entered ? "translate-y-0" : "-translate-y-[calc(100%+1rem)]",
+          "pointer-events-auto w-full max-w-2xl rounded-2xl px-3 py-2.5 shadow-[0_8px_30px_-4px_rgba(0,0,0,0.25)] transition-[transform,opacity] duration-300 ease-out sm:px-4 sm:py-3",
+          "bg-gradient-to-r from-[color:var(--primary)] to-[#3d4a38] text-[color:var(--primary-foreground)]",
+          entered ? "translate-y-0 opacity-100" : "-translate-y-[120%] opacity-0",
         ].join(" ")}
       >
-        <div className="flex gap-3">
-          <LogoMark className="h-11 w-11 shrink-0" />
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="shrink-0 rounded-xl bg-white p-1 ring-1 ring-white/40">
+            <LogoMark className="h-8 w-8 sm:h-9 sm:w-9" title={APP_BRAND_NAME} />
+          </div>
           <div className="min-w-0 flex-1">
-            <p id="pwa-install-title" className="font-serif text-base font-extrabold text-[color:var(--foreground)]">
-              Thêm {APP_BRAND_SHORT_NAME} vào màn hình chính
+            <p id="pwa-install-title" className="font-serif text-sm font-bold leading-tight sm:text-base">
+              Cài đặt ứng dụng
             </p>
-            <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
-              Mở nhanh như ứng dụng, không cần gõ địa chỉ mỗi lần.
+            <p className="mt-0.5 text-[11px] leading-snug text-white/85 sm:text-xs">
+              Cài đặt {APP_BRAND_NAME} để mở nhanh hơn và gọn như app trên màn hình chính.
             </p>
-            {isIos && !deferredPrompt ? (
-              <p className="mt-2 text-xs text-[color:var(--muted-foreground)]">
-                Trên Safari: nhấn <strong className="text-[color:var(--foreground)]">Chia sẻ</strong> (vuông có mũi tên)
-                rồi chọn <strong className="text-[color:var(--foreground)]">Thêm vào Màn hình chính</strong>.
+            {showIosHelp ? (
+              <p className="mt-1.5 text-[10px] leading-snug text-white/80 sm:text-[11px]">
+                Safari: <strong className="text-white">Chia sẻ</strong> →{" "}
+                <strong className="text-white">Thêm vào Màn hình chính</strong>.
               </p>
             ) : null}
-            {showManualNonIos ? (
-              <p className="mt-2 text-xs text-[color:var(--muted-foreground)]">
-                Trên Chrome / Edge: mở menu <strong className="text-[color:var(--foreground)]">⋮</strong> (ba chấm) →{" "}
-                <strong className="text-[color:var(--foreground)]">Cài đặt ứng dụng</strong> hoặc{" "}
-                <strong className="text-[color:var(--foreground)]">Thêm vào Màn hình chính</strong>.
+            {showChromeHelp ? (
+              <p className="mt-1.5 text-[10px] leading-snug text-white/80 sm:text-[11px]">
+                Chrome / Edge: menu <strong className="text-white">⋮</strong> →{" "}
+                <strong className="text-white">Cài đặt ứng dụng</strong> hoặc{" "}
+                <strong className="text-white">Thêm vào Màn hình chính</strong>.
               </p>
             ) : null}
           </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {deferredPrompt ? (
-            <Button type="button" size="md" onClick={() => void onInstallClick()}>
-              Cài {APP_BRAND_NAME}
-            </Button>
-          ) : null}
-          <Button type="button" variant="outline" size="md" onClick={hideForMonth}>
-            Để sau
-          </Button>
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <button
+              type="button"
+              onClick={onPrimaryInstallClick}
+              className="whitespace-nowrap rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-[color:var(--primary)] shadow-sm transition hover:bg-white/95 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm"
+            >
+              Cài đặt
+            </button>
+            <button
+              type="button"
+              onClick={hideForMonth}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 text-white ring-1 ring-white/25 transition hover:bg-white/25"
+              aria-label="Đóng"
+            >
+              <X className="h-4 w-4" strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
         {forceBanner ? (
-          <p className="mt-2 text-[10px] text-[color:var(--muted-foreground)]">
-            Chế độ thử: thêm <code className="rounded bg-[color:var(--muted)]/50 px-1">?pwaBanner=1</code> hoặc{" "}
-            <code className="rounded bg-[color:var(--muted)]/50 px-1">NEXT_PUBLIC_DEBUG_PWA_BANNER</code>.
+          <p className="mt-2 border-t border-white/20 pt-2 text-[10px] text-white/70">
+            Thử: <code className="rounded bg-black/15 px-1">?pwaBanner=1</code> hoặc{" "}
+            <code className="rounded bg-black/15 px-1">NEXT_PUBLIC_DEBUG_PWA_BANNER</code>
           </p>
         ) : null}
       </div>
