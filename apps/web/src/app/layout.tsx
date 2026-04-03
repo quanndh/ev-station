@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Nunito } from "next/font/google";
 
+import { InstallPwaBanner } from "@/components/pwa/InstallPwaBanner";
 import { APP_BRAND_NAME } from "@/lib/appBrand";
 import "./globals.css";
 
@@ -27,9 +28,27 @@ export const metadata: Metadata = {
     "Trạm sạc xe điện — quét QR, bắt đầu sạc, thanh toán sau phiên.",
   applicationName: appName,
   icons: {
-    icon: "/brand/logo-mark.svg",
-    apple: "/brand/logo-mark.svg",
+    icon: [
+      { url: "/brand/pwa-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/brand/pwa-icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/brand/logo-mark.svg", type: "image/svg+xml" },
+    ],
+    apple: "/brand/pwa-icon-192.png",
   },
+  appleWebApp: {
+    capable: true,
+    title: appName,
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#5d7052" },
+    { media: "(prefers-color-scheme: dark)", color: "#5d7052" },
+  ],
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -42,7 +61,10 @@ export default function RootLayout({
       lang="vi"
       className={`${heading.variable} ${body.variable} min-h-dvh antialiased`}
     >
-      <body className="flex min-h-dvh flex-col">{children}</body>
+      <body className="flex min-h-dvh flex-col">
+        {children}
+        <InstallPwaBanner />
+      </body>
     </html>
   );
 }
