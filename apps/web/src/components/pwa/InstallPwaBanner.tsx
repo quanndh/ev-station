@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 
@@ -7,10 +8,8 @@ import { LogoMark } from "@/components/brand/LogoMark";
 import { Container } from "@/components/ui/container";
 import { APP_BRAND_NAME } from "@/lib/appBrand";
 
-const STORAGE_SNOOZE_UNTIL = "evgs_pwa_install_snooze_until";
 /** Trễ ngắn để trang ổn định; hiển thị cùng tốc độ dù đã có `beforeinstallprompt` hay chưa. */
 const SHOW_DELAY_MS = 2200;
-const SNOOZE_MS = 30 * 24 * 60 * 60 * 1000;
 
 const DEBUG_PUBLIC = process.env.NEXT_PUBLIC_DEBUG_PWA_BANNER === "true";
 
@@ -30,25 +29,6 @@ function isInstalledPwa(): boolean {
   return false;
 }
 
-function readSnoozeUntil(): number | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_SNOOZE_UNTIL);
-    if (!raw) return null;
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeSnoozeOneMonth() {
-  try {
-    localStorage.setItem(STORAGE_SNOOZE_UNTIL, String(Date.now() + SNOOZE_MS));
-  } catch {
-    /* ignore */
-  }
-}
-
 /** Mọi trình duyệt trên iPhone (kể cả Chrome) đều WebKit — không có `beforeinstallprompt`. */
 function isLikelyIos(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -66,9 +46,10 @@ export function InstallPwaBanner() {
   const [iosStepsOpen, setIosStepsOpen] = useState(false);
   const iosStepsRef = useRef<HTMLDivElement>(null);
   const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pathname = usePathname();
 
-  const hideForMonth = useCallback(() => {
-    writeSnoozeOneMonth();
+  /** Chỉ ẩn phiên hiện tại; không lưu localStorage — lần vào/đổi route sau vẫn hiện lại. */
+  const dismissBanner = useCallback(() => {
     setEntered(false);
     setOpen(false);
   }, []);
@@ -77,10 +58,6 @@ export function InstallPwaBanner() {
     if (typeof window === "undefined") return;
     if (!forceBanner && !window.isSecureContext) return;
     if (isInstalledPwa()) return;
-    if (!forceBanner) {
-      const until = readSnoozeUntil();
-      if (until != null && Date.now() < until) return;
-    }
     setEntered(false);
     setOpen(true);
   }, [forceBanner]);
@@ -113,10 +90,6 @@ export function InstallPwaBanner() {
     if (typeof window === "undefined") return;
     if (!forceBanner && !window.isSecureContext) return;
     if (isInstalledPwa()) return;
-    if (!forceBanner) {
-      const until = readSnoozeUntil();
-      if (until != null && Date.now() < until) return;
-    }
 
     const onBip = (e: Event) => {
       e.preventDefault();
@@ -141,10 +114,6 @@ export function InstallPwaBanner() {
     if (typeof window === "undefined") return;
     if (!forceBanner && !window.isSecureContext) return;
     if (isInstalledPwa()) return;
-    if (!forceBanner) {
-      const until = readSnoozeUntil();
-      if (until != null && Date.now() < until) return;
-    }
 
     if (showTimerRef.current) clearTimeout(showTimerRef.current);
 
@@ -153,7 +122,7 @@ export function InstallPwaBanner() {
     return () => {
       if (showTimerRef.current) clearTimeout(showTimerRef.current);
     };
-  }, [forceBanner, tryShow]);
+  }, [forceBanner, tryShow, pathname]);
 
   async function onInstallClick() {
     if (deferredPrompt) {
@@ -227,7 +196,7 @@ export function InstallPwaBanner() {
             </button>
             <button
               type="button"
-              onClick={hideForMonth}
+              onClick={dismissBanner}
               className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 text-white ring-1 ring-white/25 transition hover:bg-white/25"
               aria-label="Đóng"
             >
