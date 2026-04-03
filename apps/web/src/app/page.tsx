@@ -53,8 +53,8 @@ export default function Home() {
               </li>
             </ol>
 
-            <div className="mt-8 flex justify-center text-center">
-              <Link href="/scan">
+            <div className="mt-8 flex flex-col items-center gap-6 sm:flex-row sm:flex-wrap sm:justify-center">
+              <Link href="/scan" className="text-center">
                 <div className="inline-flex flex-col items-center gap-3">
                   <span
                     className={[
@@ -72,6 +72,11 @@ export default function Home() {
                     Quét QR để vào trạm
                   </div>
                 </div>
+              </Link>
+              <Link href="/qr-test">
+                <Button type="button" variant="outline" size="lg">
+                  Tạo QR và poster in trạm
+                </Button>
               </Link>
             </div>
 
