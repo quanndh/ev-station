@@ -62,8 +62,8 @@ export default function RootLayout({
       className={`${heading.variable} ${body.variable} min-h-dvh antialiased`}
     >
       <body className="flex min-h-dvh flex-col">
-        {children}
         <InstallPwaBanner />
+        <div className="flex min-h-0 min-h-dvh flex-1 flex-col">{children}</div>
       </body>
     </html>
   );

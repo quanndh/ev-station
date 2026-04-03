@@ -1,15 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 
 import { LogoMark } from "@/components/brand/LogoMark";
+import { Container } from "@/components/ui/container";
 import { APP_BRAND_NAME } from "@/lib/appBrand";
 
 const STORAGE_SNOOZE_UNTIL = "evgs_pwa_install_snooze_until";
 const SHOW_DELAY_MS = 2200;
-/** Android/Chrome: chờ thêm trước khi gợi ý thủ công (nhiều máy bắn `beforeinstallprompt` trễ). */
-const MOBILE_FALLBACK_EXTRA_MS = 5500;
+/** Chờ thêm nếu `beforeinstallprompt` tới trễ — vẫn hiện dải banner ở đầu body. */
+const INSTALL_BANNER_FALLBACK_EXTRA_MS = 5500;
 const SNOOZE_MS = 30 * 24 * 60 * 60 * 1000;
 
 const DEBUG_PUBLIC = process.env.NEXT_PUBLIC_DEBUG_PWA_BANNER === "true";
@@ -49,28 +50,18 @@ function writeSnoozeOneMonth() {
   }
 }
 
-function isLikelyIos(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent;
-  if (/iPad|iPhone|iPod/i.test(ua)) return true;
-  if (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) return true;
-  return false;
-}
-
 export function InstallPwaBanner() {
   const [open, setOpen] = useState(false);
   const [entered, setEntered] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isIos, setIsIos] = useState(false);
   const [forceBanner, setForceBanner] = useState(false);
-  const [fallbackInstallHint, setFallbackInstallHint] = useState(false);
   const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hideForMonth = useCallback(() => {
     writeSnoozeOneMonth();
     setEntered(false);
-    window.setTimeout(() => setOpen(false), 280);
+    setOpen(false);
   }, []);
 
   const tryShow = useCallback(() => {
@@ -84,14 +75,6 @@ export function InstallPwaBanner() {
     setEntered(false);
     setOpen(true);
   }, [forceBanner]);
-
-  useEffect(() => {
-    if (open) setFallbackInstallHint(false);
-  }, [open]);
-
-  useLayoutEffect(() => {
-    setIsIos(isLikelyIos());
-  }, []);
 
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
@@ -156,13 +139,6 @@ export function InstallPwaBanner() {
       };
     }
 
-    if (isIos) {
-      showTimerRef.current = setTimeout(tryShow, SHOW_DELAY_MS);
-      return () => {
-        if (showTimerRef.current) clearTimeout(showTimerRef.current);
-      };
-    }
-
     if (deferredPrompt) {
       showTimerRef.current = setTimeout(tryShow, SHOW_DELAY_MS);
       return () => {
@@ -170,50 +146,44 @@ export function InstallPwaBanner() {
       };
     }
 
-    // Chrome đôi khi không bắn `beforeinstallprompt` (localhost, chưa đủ điều kiện PWA…). Vẫn hiện gợi ý cài thủ công.
-    fallbackTimerRef.current = setTimeout(tryShow, SHOW_DELAY_MS + MOBILE_FALLBACK_EXTRA_MS);
+    fallbackTimerRef.current = setTimeout(
+      tryShow,
+      SHOW_DELAY_MS + INSTALL_BANNER_FALLBACK_EXTRA_MS,
+    );
     return () => {
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
     };
-  }, [deferredPrompt, isIos, forceBanner, tryShow]);
+  }, [deferredPrompt, forceBanner, tryShow]);
 
   async function onInstallClick() {
     if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
+    const dp = deferredPrompt;
     setDeferredPrompt(null);
     setEntered(false);
-    window.setTimeout(() => setOpen(false), 280);
-  }
-
-  function onPrimaryInstallClick() {
-    if (deferredPrompt) {
-      void onInstallClick();
-      return;
-    }
-    setFallbackInstallHint(true);
+    setOpen(false);
+    await dp.prompt();
   }
 
   if (!open) return null;
 
-  const showManualNonIos = !deferredPrompt && !isIos;
-  const showIosHelp = Boolean(isIos && !deferredPrompt && fallbackInstallHint);
-  const showChromeHelp = Boolean(showManualNonIos && fallbackInstallHint);
+  const canNativeInstall = !!deferredPrompt;
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 top-0 z-[100] flex justify-center px-3 pt-[max(0.25rem,env(safe-area-inset-top))]"
+      className="shrink-0 w-full pt-[max(0.5rem,env(safe-area-inset-top))] pb-2"
       aria-hidden={!entered}
     >
-      <div
-        role="dialog"
-        aria-modal="false"
-        aria-labelledby="pwa-install-title"
-        className={[
-          "pointer-events-auto w-full max-w-2xl rounded-2xl px-3 py-2.5 shadow-[0_8px_30px_-4px_rgba(0,0,0,0.25)] transition-[transform,opacity] duration-300 ease-out sm:px-4 sm:py-3",
-          "bg-gradient-to-r from-[color:var(--primary)] to-[#3d4a38] text-[color:var(--primary-foreground)]",
-          entered ? "translate-y-0 opacity-100" : "-translate-y-[120%] opacity-0",
-        ].join(" ")}
-      >
+      <Container>
+        <div
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby="pwa-install-title"
+          className={[
+            "rounded-2xl px-3 py-2.5 shadow-[0_4px_18px_-2px_rgba(0,0,0,0.18)] transition-[transform,opacity] duration-300 ease-out sm:px-4 sm:py-3",
+            "bg-gradient-to-r from-[color:var(--primary)] to-[#3d4a38] text-[color:var(--primary-foreground)]",
+            entered ? "translate-y-0 opacity-100" : "-translate-y-1.5 opacity-0",
+          ].join(" ")}
+        >
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="shrink-0 rounded-xl bg-white p-1 ring-1 ring-white/40">
             <LogoMark className="h-8 w-8 sm:h-9 sm:w-9" title={APP_BRAND_NAME} />
@@ -225,25 +195,23 @@ export function InstallPwaBanner() {
             <p className="mt-0.5 text-[11px] leading-snug text-white/85 sm:text-xs">
               Cài đặt {APP_BRAND_NAME} để mở nhanh hơn và gọn như app trên màn hình chính.
             </p>
-            {showIosHelp ? (
-              <p className="mt-1.5 text-[10px] leading-snug text-white/80 sm:text-[11px]">
-                Safari: <strong className="text-white">Chia sẻ</strong> →{" "}
-                <strong className="text-white">Thêm vào Màn hình chính</strong>.
-              </p>
-            ) : null}
-            {showChromeHelp ? (
-              <p className="mt-1.5 text-[10px] leading-snug text-white/80 sm:text-[11px]">
-                Chrome / Edge: menu <strong className="text-white">⋮</strong> →{" "}
-                <strong className="text-white">Cài đặt ứng dụng</strong> hoặc{" "}
-                <strong className="text-white">Thêm vào Màn hình chính</strong>.
-              </p>
-            ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <button
               type="button"
-              onClick={onPrimaryInstallClick}
-              className="whitespace-nowrap rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-[color:var(--primary)] shadow-sm transition hover:bg-white/95 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm"
+              disabled={!canNativeInstall}
+              title={
+                canNativeInstall
+                  ? undefined
+                  : "Đợi trình duyệt sẵn sàng — sẽ mở cửa sổ Cài đặt của Chrome/Edge"
+              }
+              onClick={() => void onInstallClick()}
+              className={[
+                "whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-bold shadow-sm transition active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm",
+                canNativeInstall
+                  ? "bg-white text-[color:var(--primary)] hover:bg-white/95"
+                  : "cursor-not-allowed bg-white/35 text-white/80",
+              ].join(" ")}
             >
               Cài đặt
             </button>
@@ -259,11 +227,12 @@ export function InstallPwaBanner() {
         </div>
         {forceBanner ? (
           <p className="mt-2 border-t border-white/20 pt-2 text-[10px] text-white/70">
-            Thử: <code className="rounded bg-black/15 px-1">?pwaBanner=1</code> hoặc{" "}
-            <code className="rounded bg-black/15 px-1">NEXT_PUBLIC_DEBUG_PWA_BANNER</code>
+            Thử: <code className="rounded bg-black/15 px-1">?pwaBanner=1</code> — nút chỉ bật khi có{" "}
+            <code className="rounded bg-black/15 px-1">beforeinstallprompt</code> (HTTPS, đủ điều kiện PWA).
           </p>
         ) : null}
-      </div>
+        </div>
+      </Container>
     </div>
   );
 }
