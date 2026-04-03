@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  user
+  station_owner
+  admin
+}
+
+enum ChargingSessionStatus {
+  active
+  completed
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  confirmed
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+
+  /// Khách QR: id thiết bị (UUID) — một user ẩn danh / thiết bị, tách khỏi user đăng nhập.
+  chargingDeviceId String? @unique
+
+  role Role @default(user)
+
+  stations          Station[]         @relation("StationOwner")
+  chargingSessions  ChargingSession[] @relation("UserChargingSessions")
+  paymentsConfirmed Payment[]         @relation("PaymentConfirmedBy")
+
+  accounts Account[]
+  sessions Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Station {
+  id      String  @id @default(cuid())
+  ownerId String?
+
+  name String
+  slug String @unique
+
+  // OCPP Charge Point ID used in BootNotification.
+  ocppChargePointId String @unique
+
+  // MVP: each station is treated as exactly one connector.
+  ocppConnectorId Int @default(1)
+
+  lastSeenAt DateTime?
+
+  defaultPriceVndPerKwh Int?
+
+  owner User? @relation("StationOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  chargingSessions ChargingSession[]
+  ocppEvents       OcppEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ChargingSession {
+  id String @id @default(cuid())
+
+  userId    String
+  stationId String
+
+  status      ChargingSessionStatus @default(active)
+  connectorId Int                   @default(1)
+
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  /// Bí mật một lần: gửi khi kết thúc sạc / xem biên lai (không cần đăng nhập).
+  stopKey String?
+
+  // Stored as kWh (not Wh), updated from MeterValues.
+  kWh Decimal?
+
+  amountVnd Int?
+
+  paymentStatus PaymentStatus @default(pending)
+
+  user    User    @relation("UserChargingSessions", fields: [userId], references: [id], onDelete: Cascade)
+  station Station @relation(fields: [stationId], references: [id], onDelete: Cascade)
+
+  payment Payment?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Payment {
+  id String @id @default(cuid())
+
+  sessionId String @unique
+  method    String // MVP: qr_transfer
+  reference String
+
+  status    PaymentStatus @default(pending)
+  amountVnd Int
+
+  confirmedAt       DateTime?
+  confirmedByUserId String?
+
+  chargingSession ChargingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  confirmedByUser User?           @relation("PaymentConfirmedBy", fields: [confirmedByUserId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model GlobalPricePolicy {
+  // Singleton row with id=1.
+  id Int @id @default(1)
+
+  priceVndPerKwh Int
+
+  updatedAt DateTime @updatedAt
+}
+
+model OcppEvent {
+  id String @id @default(cuid())
+
+  stationId     String?
+  chargePointId String
+  connectorId   Int?
+
+  type    String
+  payload Json
+
+  station Station? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+}
+
+// ---- Auth.js (NextAuth) Prisma adapter models ----
+// https://authjs.dev/reference/adapter/prisma
+
+model Account {
+  id                String @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+
+  refresh_token String?
+  access_token  String?
+  expires_at    Int?
+  token_type    String?
+  scope         String?
+  id_token      String?
+  session_state String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

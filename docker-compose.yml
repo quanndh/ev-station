@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: evstation
+      POSTGRES_PASSWORD: evstation
+      POSTGRES_DB: evstation
+    ports:
+      - "5432:5432"
+    volumes:
+      - evstation_pg_data:/var/lib/postgresql/data
+
+  ocpp:
+    build:
+      context: .
+      dockerfile: apps/ocpp/Dockerfile
+    environment:
+      PORT: 9000
+      WS_PATH: /ocpp
+      OCPP_API_KEY: ${OCPP_API_KEY:-}
+      DATABASE_URL: postgresql://evstation:evstation@postgres:5432/evstation?schema=public
+    depends_on:
+      - postgres
+    ports:
+      - "9000:9000"
+    command: sh -c "pnpm -C packages/db migrate:deploy && node apps/ocpp/dist/index.js"
+
+volumes:
+  evstation_pg_data:
+

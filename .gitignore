@@ -1,0 +1,77 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# pnpm
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Vercel
+.vercel
+
+# Environment (keep examples)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+!.env.example
+
+# Secrets & certificates
+*.pem
+*.p12
+*.key
+
+# Logs & debug
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Prisma (generated client is in node_modules; local DB dumps optional)
+*.db
+*.db-journal
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / editors
+.idea/
+*.swp
+*.swo
+*~
+
+# Optional: local pnpm store if copied into repo
+.pnpm-store/
+
+# Turbo (if added later)
+.turbo/
+
+# Misc
+*.local
+
+# Cursor/sandbox home dirs — never commit (có thể chứa Prisma engines, cache)
+.tmp_home/
+.tmp_prisma_home/

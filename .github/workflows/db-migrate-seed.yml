@@ -1,0 +1,34 @@
+# Chạy migration + seed lên DB production (hoặc staging) — không gắn vào mỗi lần deploy Vercel.
+# Cấu hình GitHub → Settings → Secrets: DATABASE_URL (PostgreSQL, vd. Neon/Supabase/Vercel Postgres).
+name: DB migrate & seed
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate-and-seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm db:migrate
+
+      - name: Prisma seed
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm db:seed

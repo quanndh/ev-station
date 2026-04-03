@@ -1,0 +1,21 @@
+{
+  "name": "ev-green-station",
+  "private": true,
+  "packageManager": "pnpm@8.14.1",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm -r dev",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "seed:users": "node apps/web/scripts/seed-users.mjs",
+    "db:generate": "node scripts/prisma-with-env.mjs generate --schema=packages/db/prisma/schema.prisma",
+    "db:migrate": "node scripts/prisma-with-env.mjs migrate deploy --schema=packages/db/prisma/schema.prisma",
+    "db:seed": "node scripts/prisma-with-env.mjs db seed --schema=packages/db/prisma/schema.prisma",
+    "vercel-build": "pnpm exec prisma generate --schema=packages/db/prisma/schema.prisma && pnpm -C packages/types build && pnpm -C packages/db build && pnpm -C apps/web build"
+  },
+  "devDependencies": {
+    "dotenv": "^17.4.0",
+    "prisma": "6.19.3",
+    "typescript": "^5"
+  }
+}

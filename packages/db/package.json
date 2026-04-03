@@ -1,0 +1,26 @@
+{
+  "name": "@ev/db",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "generate": "node ../../scripts/prisma-with-env.mjs generate --schema=packages/db/prisma/schema.prisma",
+    "migrate:deploy": "node ../../scripts/prisma-with-env.mjs migrate deploy --schema=packages/db/prisma/schema.prisma",
+    "migrate:create-only": "prisma migrate dev --create-only"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.6.0",
+    "@prisma/client": "6.19.3",
+    "dotenv": "^17.4.0",
+    "prisma": "6.19.3"
+  }
+}
