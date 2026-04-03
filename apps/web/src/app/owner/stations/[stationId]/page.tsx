@@ -49,6 +49,7 @@ const sessionStatusVi: Record<string, string> = {
 const paymentStatusVi: Record<string, string> = {
   pending: "Chờ xác nhận",
   confirmed: "Đã xác nhận",
+  cancelled: "Đã huỷ",
 };
 
 function labelSessionStatus(v: string) {

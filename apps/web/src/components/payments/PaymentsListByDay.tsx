@@ -35,6 +35,7 @@ function formatVnd(amount: number) {
 const paymentStatusVi: Record<string, string> = {
   pending: "Chờ xác nhận",
   confirmed: "Đã xác nhận",
+  cancelled: "Đã huỷ",
 };
 
 function methodLabel(m: string) {

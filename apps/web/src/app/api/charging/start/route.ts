@@ -84,7 +84,11 @@ export async function POST(req: Request) {
       await prisma.chargingSession
         .update({
           where: { id: session.id },
-          data: { status: "cancelled", endedAt: new Date() },
+          data: {
+            status: "cancelled",
+            endedAt: new Date(),
+            paymentStatus: "cancelled",
+          },
         })
         .catch(() => undefined);
       await prisma.payment

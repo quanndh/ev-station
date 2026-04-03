@@ -22,6 +22,7 @@ enum ChargingSessionStatus {
 enum PaymentStatus {
   pending
   confirmed
+  cancelled
 }
 
 model User {

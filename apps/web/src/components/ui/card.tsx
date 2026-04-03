@@ -24,9 +24,20 @@ export function Card({
   );
 }
 
-export function CardTitle({ children }: { children: ReactNode }) {
+export function CardTitle({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <h2 className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--foreground)]">
+    <h2
+      className={[
+        "font-serif text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--foreground)]",
+        className,
+      ].join(" ")}
+    >
       {children}
     </h2>
   );

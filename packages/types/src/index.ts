@@ -6,7 +6,7 @@ export type PaymentMethod = "qr_transfer";
 
 export type ChargingSessionStatus = "active" | "completed" | "cancelled";
 
-export type PaymentStatus = "pending" | "confirmed";
+export type PaymentStatus = "pending" | "confirmed" | "cancelled";
 
 export interface StartChargingCommand {
   sessionId: string;
