@@ -3,10 +3,14 @@ import type { ReactNode } from "react";
 export function Card({
   children,
   className = "",
+  padding = "default",
 }: {
   children: ReactNode;
   className?: string;
+  /** compact: ít padding — danh sách dài trên mobile/desktop. */
+  padding?: "default" | "compact";
 }) {
+  const pad = padding === "compact" ? "p-3.5 sm:p-4" : "p-5 sm:p-6";
   return (
     <div
       className={[
@@ -14,7 +18,7 @@ export function Card({
         "border border-[color:var(--border)]/60",
         "rounded-[var(--radius-card-lg)]",
         "shadow-[var(--shadow-soft)]",
-        "p-5 sm:p-6",
+        pad,
         "transition-all duration-300",
         className,
       ].join(" ")}

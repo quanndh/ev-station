@@ -27,14 +27,18 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-4 z-40">
-      <Container>
+      <Container
+        className={
+          hidePartner ? "!max-w-[min(112rem,calc(100vw-1.5rem))]" : undefined
+        }
+      >
         <div className="flex items-center justify-between gap-3 rounded-full border border-[color:var(--border)]/60 bg-white/70 px-3 py-2 shadow-[var(--shadow-soft)] backdrop-blur-md">
           <div className="flex items-center gap-2">
             {drawer ? (
               <button
                 type="button"
                 onClick={drawer.openDrawer}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--border)]/60 bg-white/60 text-[color:var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-white active:scale-[0.99] lg:hidden"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--border)]/60 bg-white/60 text-[color:var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-white active:scale-[0.99] xl:hidden"
                 aria-label="Mở menu"
               >
                 <Menu className="h-5 w-5" />

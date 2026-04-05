@@ -2,12 +2,48 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@ev/db";
 import { requireApiRole } from "@/lib/apiAuth";
+import { endActiveChargingSessionsForStation } from "@/lib/endActiveChargingSessionsForStation";
+
+/** Bật/tắt nhận phiên sạc (toàn quyền admin). */
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ stationId: string }> },
+) {
+  const u = await requireApiRole(req, ["admin"]);
+  if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { stationId } = await params;
+  const body = await req.json().catch(() => ({}));
+  const { disabled } = body as { disabled?: boolean };
+  if (typeof disabled !== "boolean") {
+    return NextResponse.json({ error: "disabled boolean required" }, { status: 400 });
+  }
+
+  const exists = await prisma.station.findUnique({
+    where: { id: stationId },
+    select: { id: true },
+  });
+  if (!exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (disabled) {
+    await endActiveChargingSessionsForStation(stationId);
+  }
+
+  await prisma.station.update({
+    where: { id: stationId },
+    data: disabled
+      ? { disabledAt: new Date(), disabledBy: "admin" }
+      : { disabledAt: null, disabledBy: null },
+  });
+
+  return NextResponse.json({ ok: true });
+}
 
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ stationId: string }> },
 ) {
-  const u = requireApiRole(req, ["admin"]);
+  const u = await requireApiRole(req, ["admin"]);
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { stationId } = await params;
@@ -70,7 +106,7 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ stationId: string }> },
 ) {
-  const u = requireApiRole(req, ["admin"]);
+  const u = await requireApiRole(req, ["admin"]);
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { stationId } = await params;

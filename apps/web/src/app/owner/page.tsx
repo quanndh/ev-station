@@ -39,16 +39,16 @@ export default function OwnerOverviewPage() {
   return (
     <DashboardOverview
       title="Owner"
-      description="Tổng quan doanh thu và trạm của bạn."
+      breadcrumbItems={[{ href: "/", label: "Trang chủ" }, { label: "Tổng quan" }]}
       metrics={metrics}
       error={error}
       labels={{
-        stationsTitle: "Trạm của bạn",
-        stationsMuted: "Đang quản lý.",
-        sessionsTitle: "Tổng lượt sạc",
-        sessionsMuted: "Theo từng phiên sạc.",
-        revenueTitle: "Doanh thu đã xác nhận",
-        revenueMuted: "Chỉ thanh toán đã xác nhận.",
+        stationsTitle: "Trạm",
+        stationsMuted: "",
+        sessionsTitle: "Phiên sạc",
+        sessionsMuted: "",
+        revenueTitle: "Doanh thu (đã XN)",
+        revenueMuted: "",
       }}
     />
   );

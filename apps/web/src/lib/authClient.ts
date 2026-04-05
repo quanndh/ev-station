@@ -82,7 +82,12 @@ export async function login(email: string, password: string) {
     body: JSON.stringify({ email, password }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? "Login failed");
+  if (!res.ok) {
+    const msg = typeof data.error === "string" ? data.error : "Login failed";
+    const err = new Error(msg) as Error & { errorCode?: string };
+    if (typeof data.errorCode === "string") err.errorCode = data.errorCode;
+    throw err;
+  }
   setToken(data.token);
   return data.user as ClientUser;
 }
@@ -95,7 +100,12 @@ export async function me(): Promise<ClientUser> {
     cache: "no-store",
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? "Unauthorized");
+  if (!res.ok) {
+    if (res.status === 403 && data.errorCode === "account_disabled") {
+      clearToken();
+    }
+    throw new Error(typeof data.error === "string" ? data.error : "Unauthorized");
+  }
   return data.user as ClientUser;
 }
 

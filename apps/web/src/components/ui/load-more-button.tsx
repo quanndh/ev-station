@@ -13,8 +13,15 @@ export function LoadMoreButton({
 }) {
   if (!hasMore) return null;
   return (
-    <div className="mt-6 flex justify-center">
-      <Button type="button" variant="outline" size="lg" onClick={() => void onLoadMore()} disabled={loading}>
+    <div className="mt-4 flex justify-center sm:mt-5">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="sm:h-12 sm:px-8 sm:text-base"
+        onClick={() => void onLoadMore()}
+        disabled={loading}
+      >
         {loading ? "Đang tải…" : "Tải thêm"}
       </Button>
     </div>

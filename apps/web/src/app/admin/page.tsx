@@ -35,15 +35,15 @@ export default function AdminOverviewPage() {
     <ClientGuard allow={["admin"]}>
       <DashboardOverview
         title="Admin"
-        description="Tổng quan hệ thống và doanh thu đã xác nhận."
+        breadcrumbItems={[{ href: "/", label: "Trang chủ" }, { label: "Tổng quan" }]}
         metrics={metrics}
         labels={{
-          stationsTitle: "Tổng trạm",
-          stationsMuted: "Đang quản lý trong hệ thống.",
-          sessionsTitle: "Tổng lượt sạc",
-          sessionsMuted: "Theo từng phiên sạc.",
-          revenueTitle: "Doanh thu (đã xác nhận)",
-          revenueMuted: "Chỉ thanh toán đã xác nhận.",
+          stationsTitle: "Trạm",
+          stationsMuted: "",
+          sessionsTitle: "Phiên sạc",
+          sessionsMuted: "",
+          revenueTitle: "Doanh thu (đã XN)",
+          revenueMuted: "",
         }}
       />
     </ClientGuard>

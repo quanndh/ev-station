@@ -59,13 +59,12 @@ export function OwnerShell({
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
-      <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        <aside className="hidden lg:block">
+    <div className="mx-auto w-full max-w-[min(112rem,calc(100vw-1.5rem))] px-4 sm:px-6 lg:px-8">
+      <div className="grid gap-6 xl:grid-cols-[260px_1fr]">
+        <aside className="hidden xl:block">
           <div className="sticky top-24 rounded-[var(--radius-card-lg)] border border-[color:var(--border)]/60 bg-white/60 p-4 shadow-[var(--shadow-soft)] backdrop-blur-md">
             <div className="px-2 pb-3">
               <div className="font-serif text-lg font-extrabold tracking-tight">Owner</div>
-              <div className="mt-1 text-xs text-[color:var(--muted-foreground)]">Menu trạm của bạn</div>
             </div>
             <Nav />
           </div>
@@ -75,7 +74,7 @@ export function OwnerShell({
       </div>
 
       {drawerOpen ? (
-        <div className="lg:hidden">
+        <div className="xl:hidden">
           <div
             className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[1px]"
             onClick={() => setDrawerOpen(false)}

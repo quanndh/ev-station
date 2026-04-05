@@ -25,6 +25,12 @@ enum PaymentStatus {
   cancelled
 }
 
+/// Ai đã tạm dừng nhận phiên sạc tại trạm (owner chỉ mở lại được khi chính owner khóa).
+enum StationDisabledBy {
+  owner
+  admin
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -37,6 +43,9 @@ model User {
   chargingDeviceId String? @unique
 
   role Role @default(user)
+
+  /// Vô hiệu tài khoản: user vẫn đăng nhập nhưng không bắt đầu sạc; station_owner/admin không đăng nhập được.
+  disabledAt DateTime?
 
   stations          Station[]         @relation("StationOwner")
   chargingSessions  ChargingSession[] @relation("UserChargingSessions")
@@ -63,6 +72,10 @@ model Station {
   ocppConnectorId Int @default(1)
 
   lastSeenAt DateTime?
+
+  /// Trạm không nhận phiên sạc mới khi có `disabledAt`.
+  disabledAt   DateTime?
+  disabledBy   StationDisabledBy?
 
   defaultPriceVndPerKwh Int?
 

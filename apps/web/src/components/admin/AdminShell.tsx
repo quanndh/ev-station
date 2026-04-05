@@ -24,6 +24,7 @@ export function AdminShell({
       { href: "/admin", label: "Tổng quan" },
       { href: "/admin/users", label: "Users" },
       { href: "/admin/stations", label: "Trạm" },
+      { href: "/admin/charging/history", label: "Lịch sử sạc" },
       { href: "/admin/pricing", label: "Cài đặt" },
       { href: "/admin/payments", label: "Thanh toán" },
     ],
@@ -34,7 +35,12 @@ export function AdminShell({
     return (
       <nav className="grid gap-2">
         {items.map((it) => {
-          const active = pathname === it.href;
+          const active =
+            it.href === "/admin"
+              ? pathname === "/admin"
+              : it.href === "/admin/stations"
+                ? pathname === "/admin/stations" || pathname.startsWith("/admin/station/")
+                : pathname === it.href || pathname.startsWith(`${it.href}/`);
           return (
             <Link
               key={it.href}
@@ -56,16 +62,13 @@ export function AdminShell({
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
-      <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        {/* Desktop sidebar */}
-        <aside className="hidden lg:block">
+    <div className="mx-auto w-full max-w-[min(112rem,calc(100vw-1.5rem))] px-4 sm:px-6 lg:px-8">
+      <div className="grid gap-6 xl:grid-cols-[260px_1fr]">
+        {/* Sidebar chỉ từ xl — tablet dùng drawer như mobile, chừa chỗ cho bảng */}
+        <aside className="hidden xl:block">
           <div className="sticky top-24 rounded-[var(--radius-card-lg)] border border-[color:var(--border)]/60 bg-white/60 p-4 shadow-[var(--shadow-soft)] backdrop-blur-md">
             <div className="px-2 pb-3">
               <div className="font-serif text-lg font-extrabold tracking-tight">Admin</div>
-              <div className="mt-1 text-xs text-[color:var(--muted-foreground)]">
-                Menu quản trị
-              </div>
             </div>
             <Nav />
           </div>
@@ -77,7 +80,7 @@ export function AdminShell({
 
       {/* Mobile drawer (opened from header) */}
       {drawerOpen ? (
-        <div className="lg:hidden">
+        <div className="xl:hidden">
           <div
             className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[1px]"
             onClick={() => setDrawerOpen(false)}

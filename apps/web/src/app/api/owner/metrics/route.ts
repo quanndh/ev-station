@@ -4,7 +4,7 @@ import { prisma } from "@ev/db";
 import { requireApiRole } from "@/lib/apiAuth";
 
 export async function GET(req: Request) {
-  const u = requireApiRole(req, ["station_owner"]);
+  const u = await requireApiRole(req, ["station_owner"]);
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const [stationsCount, confirmedAgg, sessionsAgg] = await Promise.all([

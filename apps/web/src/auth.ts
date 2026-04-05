@@ -36,6 +36,13 @@ export const { handlers, auth } = NextAuth({
         const ok = await bcrypt.compare(password, user.passwordHash);
         if (!ok) return null;
 
+        if (
+          user.disabledAt &&
+          (user.role === "station_owner" || user.role === "admin")
+        ) {
+          return null;
+        }
+
         // The returned user object is attached to `user` in Auth callbacks.
         return {
           id: user.id,

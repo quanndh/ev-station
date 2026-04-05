@@ -4,7 +4,7 @@ import { prisma } from "@ev/db";
 import { requireApiRole } from "@/lib/apiAuth";
 
 export async function POST(req: Request) {
-  const u = requireApiRole(req, ["admin"]);
+  const u = await requireApiRole(req, ["admin"]);
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
-  const u = requireApiRole(req, ["admin"]);
+  const u = await requireApiRole(req, ["admin"]);
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const global = await prisma.globalPricePolicy.findUnique({
     where: { id: 1 },

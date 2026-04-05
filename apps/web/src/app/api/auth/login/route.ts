@@ -13,7 +13,14 @@ export async function POST(req: Request) {
 
   const user = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, email: true, name: true, role: true, passwordHash: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      passwordHash: true,
+      disabledAt: true,
+    },
   });
   if (!user?.passwordHash) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
@@ -22,6 +29,20 @@ export async function POST(req: Request) {
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+  }
+
+  if (
+    user.disabledAt &&
+    (user.role === "station_owner" || user.role === "admin")
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ để được hỗ trợ.",
+        errorCode: "account_disabled",
+      },
+      { status: 403 },
+    );
   }
 
   const token = signJwt(

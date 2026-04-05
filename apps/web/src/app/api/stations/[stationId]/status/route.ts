@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@ev/db";
+import { chargingBlockReasonForStation, isStationChargingBlocked } from "@/lib/chargingEligibility";
 import { getEffectivePriceVndPerKwh } from "@/lib/pricing";
 
 export async function GET(
@@ -11,9 +12,20 @@ export async function GET(
 
   const station = await prisma.station.findUnique({
     where: { id: stationId },
-    select: { id: true, slug: true, name: true, lastSeenAt: true },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      lastSeenAt: true,
+      disabledAt: true,
+      disabledBy: true,
+      owner: { select: { disabledAt: true } },
+    },
   });
   if (!station) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const chargingBlocked = isStationChargingBlocked(station);
+  const chargingBlockReason = chargingBlockReasonForStation(station);
 
   const [activeSession, priceVndPerKwh] = await Promise.all([
     prisma.chargingSession.findFirst({
@@ -41,6 +53,8 @@ export async function GET(
       name: station.name,
       lastSeenAt: station.lastSeenAt?.toISOString() ?? null,
     },
+    chargingBlocked,
+    chargingBlockReason,
     priceVndPerKwh,
     status,
     activeSession: activeSession

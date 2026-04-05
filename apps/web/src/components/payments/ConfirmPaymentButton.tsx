@@ -3,20 +3,26 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import type { ComponentProps } from "react";
 import { authedFetch } from "@/lib/authClient";
 
 export function ConfirmPaymentButton({
   sessionId,
   onConfirmed,
+  size = "sm",
+  variant = "primary",
 }: {
   sessionId: string;
   onConfirmed?: () => void;
+  size?: ComponentProps<typeof Button>["size"];
+  variant?: ComponentProps<typeof Button>["variant"];
 }) {
   const [busy, setBusy] = useState(false);
 
   return (
     <Button
-      size="sm"
+      size={size}
+      variant={variant}
       type="button"
       disabled={busy}
       onClick={async () => {
@@ -36,7 +42,7 @@ export function ConfirmPaymentButton({
         }
       }}
     >
-      {busy ? "Đang xử lý…" : "Xác nhận đã nhận tiền"}
+      {busy ? "…" : "Xác nhận"}
     </Button>
   );
 }

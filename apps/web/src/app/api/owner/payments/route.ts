@@ -3,18 +3,28 @@ import { NextResponse } from "next/server";
 import { prisma } from "@ev/db";
 import { requireApiRole } from "@/lib/apiAuth";
 import { listMeta, listTake, parseListPagination, sliceListPage } from "@/lib/apiPagination";
+import { resolveListDateRangeFromUrl } from "@/lib/vnDateRange";
 
 export async function GET(req: Request) {
-  const u = requireApiRole(req, ["station_owner"]);
+  const u = await requireApiRole(req, ["station_owner"]);
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const url = new URL(req.url);
+  const { fromYmd, toYmd, gte, lte } = resolveListDateRangeFromUrl(url);
+  const baseWhere = { chargingSession: { station: { ownerId: u.sub } } };
+  const where = {
+    ...baseWhere,
+    createdAt: { gte, lte },
+  };
+
   const { limit, offset } = parseListPagination(req);
-  const rows = await prisma.payment.findMany({
-    where: { chargingSession: { station: { ownerId: u.sub } } },
-    orderBy: { createdAt: "desc" },
-    skip: offset,
-    take: listTake(limit),
-    select: {
+  const [rows, agg] = await Promise.all([
+    prisma.payment.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: offset,
+      take: listTake(limit),
+      select: {
       id: true,
       sessionId: true,
       reference: true,
@@ -32,7 +42,13 @@ export async function GET(req: Request) {
         },
       },
     },
-  });
+    }),
+    prisma.payment.aggregate({
+      where,
+      _count: { _all: true },
+      _sum: { amountVnd: true },
+    }),
+  ]);
   const { items, hasMore } = sliceListPage(rows, limit);
 
   const payments = items.map((p) => ({
@@ -52,5 +68,13 @@ export async function GET(req: Request) {
     canConfirm: p.status === "pending",
   }));
 
-  return NextResponse.json({ payments, ...listMeta(offset, payments.length, hasMore) });
+  return NextResponse.json({
+    dateRange: { from: fromYmd, to: toYmd },
+    stats: {
+      paymentCount: agg._count._all,
+      totalAmountVnd: agg._sum.amountVnd ?? 0,
+    },
+    payments,
+    ...listMeta(offset, payments.length, hasMore),
+  });
 }

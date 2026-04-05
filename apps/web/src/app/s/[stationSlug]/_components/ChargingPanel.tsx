@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/nav/SiteHeader";
 import { formatViDateTime } from "@/lib/formatVi";
 import type { ChargingCheckoutJson } from "@/lib/chargingCheckout";
+import { MSG_CONTACT_SUPPORT_CHARGING } from "@/lib/chargingEligibility";
 import { getTokenSubject, jsonHeadersWithOptionalBearer } from "@/lib/authClient";
 import { getOrCreateChargingDeviceId } from "@/lib/chargingDeviceId";
 
@@ -31,6 +32,12 @@ export type ActiveSessionView = {
   paymentReference: string | null;
   paymentMethod: string | null;
 };
+
+export type ChargingBlockReasonClient =
+  | "user_disabled"
+  | "station_disabled"
+  | "owner_account_disabled"
+  | null;
 
 function formatVnd(amount: number) {
   return new Intl.NumberFormat("vi-VN", {
@@ -194,16 +201,24 @@ function CompletedCheckoutModal({
 
 export default function ChargingPanel({
   station,
+  initialChargingBlocked,
+  initialChargingBlockReason,
   initialPriceVndPerKwh,
   lastSeenAt: initialLastSeenAt,
   initialActiveSession,
 }: {
   station: StationInfo;
+  initialChargingBlocked: boolean;
+  initialChargingBlockReason: ChargingBlockReasonClient;
   initialPriceVndPerKwh: number;
   lastSeenAt: string | null;
   initialActiveSession: ActiveSessionView | null;
 }) {
   const [activeSession, setActiveSession] = useState<ActiveSessionView | null>(initialActiveSession);
+  const [chargingBlocked, setChargingBlocked] = useState(initialChargingBlocked);
+  const [chargingBlockReason, setChargingBlockReason] = useState<ChargingBlockReasonClient>(
+    initialChargingBlockReason,
+  );
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -250,6 +265,12 @@ export default function ChargingPanel({
         const data = await res.json();
         if (typeof data.priceVndPerKwh === "number") {
           setPriceVndPerKwh(data.priceVndPerKwh);
+        }
+        if (typeof data.chargingBlocked === "boolean") {
+          setChargingBlocked(data.chargingBlocked);
+        }
+        if (data.chargingBlockReason !== undefined) {
+          setChargingBlockReason(data.chargingBlockReason as ChargingBlockReasonClient);
         }
         if (data.station?.lastSeenAt !== undefined) {
           setLastSeenAt(data.station.lastSeenAt);
@@ -301,9 +322,14 @@ export default function ChargingPanel({
   }, [now, activeSession?.startedAt]);
 
   const ocppHint = useMemo(() => {
-    if (!lastSeenAt) return "Chưa có tín hiệu từ trạm (OCPP).";
-    return `Trạm online lần cuối: ${formatViDateTime(lastSeenAt)}`;
+    if (!lastSeenAt) return "Chưa có tín hiệu trạm.";
+    return `Online: ${formatViDateTime(lastSeenAt)}`;
   }, [lastSeenAt]);
+
+  const chargingBlockedHint = useMemo(() => {
+    if (!chargingBlocked) return null;
+    return "Trạm không nhận sạc mới.";
+  }, [chargingBlocked]);
 
   async function startCharging() {
     setError(null);
@@ -317,6 +343,17 @@ export default function ChargingPanel({
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
+      if (data.errorCode === "user_charging_disabled") {
+        setError(MSG_CONTACT_SUPPORT_CHARGING);
+        return;
+      }
+      if (
+        data.errorCode === "station_charging_disabled" ||
+        data.errorCode === "owner_account_station_blocked"
+      ) {
+        setError(MSG_CONTACT_SUPPORT_CHARGING);
+        return;
+      }
       const hint = typeof data.hint === "string" ? data.hint : "";
       setError([data.error ?? "Không thể bắt đầu sạc", hint].filter(Boolean).join(" — "));
       return;
@@ -462,7 +499,7 @@ export default function ChargingPanel({
           <Card className="rounded-tl-[4rem]">
             <CardTitle>{station.name}</CardTitle>
             <CardMuted>
-              Mã trạm: <span className="font-mono">{station.slug}</span>
+              <span className="font-mono">{station.slug}</span>
             </CardMuted>
 
             <div className="mt-5 grid gap-3 rounded-[var(--radius-card)] border border-[color:var(--border)]/60 bg-white/50 p-4 text-sm">
@@ -541,15 +578,33 @@ export default function ChargingPanel({
             ) : (
               <div className="mt-6">
                 <div className="rounded-[var(--radius-card)] border border-[color:var(--border)]/60 bg-white/50 p-5">
-                  <p className="text-[color:var(--muted-foreground)]">
-                    Kiểm tra thông tin trạm ở trên, sau đó bắt đầu phiên sạc. Thời điểm bắt đầu và số tiền
-                    sẽ được lưu trên hệ thống.
-                  </p>
-                  <div className="mt-4">
-                    <Button onClick={startCharging} size="lg">
-                      Bắt đầu sạc
-                    </Button>
-                  </div>
+                  {chargingBlocked ? (
+                    <>
+                      <p className="font-medium text-[color:var(--foreground)]">
+                        Hiện không thể bắt đầu sạc tại trạm này.
+                      </p>
+                      <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
+                        {chargingBlockedHint}
+                      </p>
+                      <div className="mt-4">
+                        <Button type="button" size="lg" disabled>
+                          Bắt đầu sạc
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[color:var(--muted-foreground)]">
+                        Kiểm tra thông tin trạm ở trên, sau đó bắt đầu phiên sạc. Thời điểm bắt đầu và số
+                        tiền sẽ được lưu trên hệ thống.
+                      </p>
+                      <div className="mt-4">
+                        <Button onClick={startCharging} size="lg">
+                          Bắt đầu sạc
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             )}

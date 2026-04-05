@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { verifyStationToken } from "@/lib/qrToken";
 import { bypassStationSignedQrToken } from "@/lib/chargingSkipOcpp";
+import { chargingBlockReasonForStation, isStationChargingBlocked } from "@/lib/chargingEligibility";
 import { getEffectivePriceVndPerKwh } from "@/lib/pricing";
 import { prisma } from "@ev/db";
 import ChargingPanel from "./_components/ChargingPanel";
@@ -23,9 +24,20 @@ export default async function StationDeepLinkPage({
 
   const station = await prisma.station.findUnique({
     where: { slug },
-    select: { id: true, slug: true, name: true, lastSeenAt: true },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      lastSeenAt: true,
+      disabledAt: true,
+      disabledBy: true,
+      owner: { select: { disabledAt: true } },
+    },
   });
   if (!station) notFound();
+
+  const chargingBlocked = isStationChargingBlocked(station);
+  const chargingBlockReason = chargingBlockReasonForStation(station);
 
   const initialPriceVndPerKwh = await getEffectivePriceVndPerKwh(station.id);
   let authorized = false;
@@ -65,6 +77,8 @@ export default async function StationDeepLinkPage({
   return (
     <ChargingPanel
       station={{ id: station.id, name: station.name, slug: station.slug }}
+      initialChargingBlocked={chargingBlocked}
+      initialChargingBlockReason={chargingBlockReason}
       initialPriceVndPerKwh={initialPriceVndPerKwh}
       lastSeenAt={station.lastSeenAt?.toISOString() ?? null}
       initialActiveSession={

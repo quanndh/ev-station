@@ -8,7 +8,7 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ stationId: string }> },
 ) {
-  const u = requireApiRole(req, ["admin"]);
+  const u = await requireApiRole(req, ["admin"]);
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { stationId } = await params;
 

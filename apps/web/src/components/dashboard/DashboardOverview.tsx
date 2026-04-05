@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 
 import { Card, CardMuted, CardTitle } from "@/components/ui/card";
+import {
+  PageBreadcrumb,
+  type PageBreadcrumbItem,
+} from "@/components/ui/page-breadcrumb";
 
 export type DashboardOverviewMetrics = {
   stationsCount: number;
@@ -28,14 +32,14 @@ function formatVnd(amount: number) {
 
 export function DashboardOverview({
   title,
-  description,
+  breadcrumbItems,
   metrics,
   error,
   labels,
   headerActions,
 }: {
   title: string;
-  description: string;
+  breadcrumbItems: PageBreadcrumbItem[];
   metrics: DashboardOverviewMetrics | null;
   error?: string | null;
   labels: DashboardOverviewLabels;
@@ -52,7 +56,7 @@ export function DashboardOverview({
           <h1 className="font-serif text-3xl sm:text-4xl font-extrabold tracking-tight">
             {title}
           </h1>
-          <p className="mt-2 text-muted-foreground">{description}</p>
+          <PageBreadcrumb items={breadcrumbItems} />
         </div>
         {headerActions ?? null}
       </div>
@@ -63,21 +67,21 @@ export function DashboardOverview({
           <div className="mt-3 text-3xl font-extrabold">
             {metrics ? metrics.stationsCount : "…"}
           </div>
-          <CardMuted>{labels.stationsMuted}</CardMuted>
+          {labels.stationsMuted ? <CardMuted>{labels.stationsMuted}</CardMuted> : null}
         </Card>
         <Card className="rounded-tr-[3rem]">
           <CardTitle>{labels.sessionsTitle}</CardTitle>
           <div className="mt-3 text-3xl font-extrabold">
             {metrics ? metrics.totalSessions : "…"}
           </div>
-          <CardMuted>{labels.sessionsMuted}</CardMuted>
+          {labels.sessionsMuted ? <CardMuted>{labels.sessionsMuted}</CardMuted> : null}
         </Card>
         <Card className="rounded-br-[3rem]">
           <CardTitle>{labels.revenueTitle}</CardTitle>
           <div className="mt-3 text-3xl font-extrabold">
             {metrics ? formatVnd(metrics.totalRevenueVndConfirmed) : "…"}
           </div>
-          <CardMuted>{labels.revenueMuted}</CardMuted>
+          {labels.revenueMuted ? <CardMuted>{labels.revenueMuted}</CardMuted> : null}
         </Card>
       </div>
     </>

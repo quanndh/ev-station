@@ -6,7 +6,7 @@ import { qrStationTokenExpMs, signStationToken } from "@/lib/qrToken";
 import { listMeta, listTake, parseListPagination, sliceListPage } from "@/lib/apiPagination";
 
 export async function POST(req: Request) {
-  const user = requireApiRole(req, ["admin"]);
+  const user = await requireApiRole(req, ["admin"]);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
@@ -64,11 +64,50 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
-  const user = requireApiRole(req, ["admin"]);
+  const user = await requireApiRole(req, ["admin"]);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { searchParams } = new URL(req.url);
+  const ownerIdParam = searchParams.get("ownerId");
+  const nameQ = searchParams.get("q")?.trim() ?? "";
+  const statusFilter = searchParams.get("status");
+
+  const andParts: object[] = [];
+
+  if (nameQ.length > 0) {
+    andParts.push({
+      OR: [
+        { name: { contains: nameQ, mode: "insensitive" as const } },
+        { slug: { contains: nameQ, mode: "insensitive" as const } },
+      ],
+    });
+  }
+
+  if (ownerIdParam === "_none") {
+    andParts.push({ ownerId: null });
+  } else if (ownerIdParam && ownerIdParam.trim().length > 0) {
+    andParts.push({ ownerId: ownerIdParam.trim() });
+  }
+
+  if (statusFilter === "open") {
+    andParts.push({
+      disabledAt: null,
+      OR: [{ ownerId: null }, { owner: { disabledAt: null } }],
+    });
+  } else if (statusFilter === "blocked") {
+    andParts.push({
+      OR: [
+        { disabledAt: { not: null } },
+        { owner: { is: { disabledAt: { not: null } } } },
+      ],
+    });
+  }
+
+  const whereClause = andParts.length ? { AND: andParts } : {};
 
   const { limit, offset } = parseListPagination(req);
   const rows = await prisma.station.findMany({
+    where: whereClause,
     orderBy: { createdAt: "desc" },
     skip: offset,
     take: listTake(limit),
@@ -81,10 +120,23 @@ export async function GET(req: Request) {
       defaultPriceVndPerKwh: true,
       lastSeenAt: true,
       ownerId: true,
-      owner: { select: { id: true, email: true, name: true } },
+      disabledAt: true,
+      disabledBy: true,
+      owner: { select: { id: true, email: true, name: true, disabledAt: true } },
     },
   });
   const { items, hasMore } = sliceListPage(rows, limit);
-  return NextResponse.json({ stations: items, ...listMeta(offset, items.length, hasMore) });
+  const stations = items.map((s) => ({
+    ...s,
+    lastSeenAt: s.lastSeenAt?.toISOString() ?? null,
+    disabledAt: s.disabledAt?.toISOString() ?? null,
+    owner: s.owner
+      ? {
+          ...s.owner,
+          disabledAt: s.owner.disabledAt?.toISOString() ?? null,
+        }
+      : null,
+  }));
+  return NextResponse.json({ stations, ...listMeta(offset, stations.length, hasMore) });
 }
 

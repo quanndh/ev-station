@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Filter } from "lucide-react";
 import { Card, CardMuted, CardMutedLine, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -8,21 +9,14 @@ import { AddFab } from "@/components/ui/add-fab";
 import { ClientGuard } from "@/components/auth/ClientGuard";
 import { authedFetch } from "@/lib/authClient";
 import { LIST_PAGE_SIZE } from "@/lib/apiPagination";
-import { formatViDateTime, formatViNumber } from "@/lib/formatVi";
-import { LoadMoreButton } from "@/components/ui/load-more-button";
-
-type StationOwnerBrief = { id: string; email: string | null; name: string | null } | null;
-
-type StationRow = {
-  id: string;
-  name: string;
-  slug: string;
-  ocppChargePointId: string;
-  defaultPriceVndPerKwh: number | null;
-  lastSeenAt: string | null;
-  ownerId: string | null;
-  owner: StationOwnerBrief;
-};
+import { ListPaginationFooter } from "@/components/ui/list-pagination-footer";
+import {
+  ManageStationCard,
+  ManageStationsTable,
+  stationRowChargingBlocked,
+  type ManageStationListRow,
+} from "@/components/manage/ManageStationListPage";
+import { PageBreadcrumb } from "@/components/ui/page-breadcrumb";
 
 type OwnerOption = { id: string; email: string | null; name: string | null };
 
@@ -32,9 +26,10 @@ function ownerLabel(o: OwnerOption) {
 }
 
 export default function AdminStationsPage() {
-  const [stations, setStations] = useState<StationRow[]>([]);
+  const [stations, setStations] = useState<ManageStationListRow[]>([]);
   const [stationsHasMore, setStationsHasMore] = useState(false);
   const [stationsNextOffset, setStationsNextOffset] = useState(0);
+  const [stationsPage, setStationsPage] = useState(1);
   const [stationsLoading, setStationsLoading] = useState(true);
   const [stationsLoadingMore, setStationsLoadingMore] = useState(false);
   const [qrByStationId, setQrByStationId] = useState<Record<string, string | null>>({});
@@ -48,11 +43,78 @@ export default function AdminStationsPage() {
   const [ownerOptions, setOwnerOptions] = useState<OwnerOption[]>([]);
   const [ownerHasMore, setOwnerHasMore] = useState(false);
   const [ownerNextOffset, setOwnerNextOffset] = useState(0);
+  const [ownerPage, setOwnerPage] = useState(1);
   const [ownerLoadingMore, setOwnerLoadingMore] = useState(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState<string>("");
   const [ownerQuery, setOwnerQuery] = useState("");
   const [ownerPickerOpen, setOwnerPickerOpen] = useState(false);
   const ownerPickerRef = useRef<HTMLDivElement>(null);
+  const qrCopiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [qrCopiedStationId, setQrCopiedStationId] = useState<string | null>(null);
+  const [stationPatchBusyId, setStationPatchBusyId] = useState<string | null>(null);
+  /** "" = tất cả, "_none" = chưa gán chủ, còn lại = ownerId */
+  const [filterOwnerId, setFilterOwnerId] = useState<string>("");
+  const [filterChargingStatus, setFilterChargingStatus] = useState<"all" | "open" | "blocked">(
+    "all",
+  );
+  const [stationNameInput, setStationNameInput] = useState("");
+  const [stationNameDebounced, setStationNameDebounced] = useState("");
+  const [ownerFilterOptions, setOwnerFilterOptions] = useState<OwnerOption[]>([]);
+  const [stationFiltersOpen, setStationFiltersOpen] = useState(false);
+  const stationFiltersActive =
+    Boolean(filterOwnerId) ||
+    filterChargingStatus !== "all" ||
+    Boolean(stationNameDebounced);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setStationNameDebounced(stationNameInput.trim()), 400);
+    return () => window.clearTimeout(t);
+  }, [stationNameInput]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const qs = new URLSearchParams({
+          role: "station_owner",
+          limit: "500",
+          offset: "0",
+        });
+        const r = await authedFetch(`/api/admin/users?${qs}`);
+        const d = await r.json().catch(() => ({}));
+        const batch = (d.users ?? []) as { id: string; email: string | null; name: string | null }[];
+        setOwnerFilterOptions(
+          batch.map((u) => ({ id: u.id, email: u.email, name: u.name })),
+        );
+      } catch {
+        setOwnerFilterOptions([]);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (qrCopiedTimerRef.current) clearTimeout(qrCopiedTimerRef.current);
+    };
+  }, []);
+
+  function flashQrCopied(stationId: string) {
+    if (qrCopiedTimerRef.current) clearTimeout(qrCopiedTimerRef.current);
+    setQrCopiedStationId(stationId);
+    qrCopiedTimerRef.current = setTimeout(() => {
+      setQrCopiedStationId(null);
+      qrCopiedTimerRef.current = null;
+    }, 2400);
+  }
+
+  async function copyQrUrl(stationId: string, url: string | null | undefined) {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      flashQrCopied(stationId);
+    } catch {
+      window.alert("Không sao chép được. Thử lại hoặc copy thủ công.");
+    }
+  }
 
   const filteredOwners = useMemo(() => {
     const q = ownerQuery.trim().toLowerCase();
@@ -64,22 +126,48 @@ export default function AdminStationsPage() {
     });
   }, [ownerOptions, ownerQuery]);
 
-  async function fetchStationsPage(offset: number, append: boolean) {
-    const qs = new URLSearchParams({
-      limit: String(LIST_PAGE_SIZE),
-      offset: String(offset),
-    });
-    const r = await authedFetch(`/api/admin/stations?${qs}`);
-    const d = await r.json();
-    const batch = (d.stations ?? []) as StationRow[];
-    if (append) setStations((prev) => [...prev, ...batch]);
-    else setStations(batch);
-    setStationsHasMore(!!d.hasMore);
-    setStationsNextOffset(typeof d.nextOffset === "number" ? d.nextOffset : offset + batch.length);
+  async function setStationChargingDisabled(stationId: string, disabled: boolean) {
+    setStationPatchBusyId(stationId);
+    try {
+      const res = await authedFetch(`/api/admin/stations/${stationId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ disabled }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof d.error === "string" ? d.error : "Thao tác thất bại");
+      await fetchStationsPage((stationsPage - 1) * LIST_PAGE_SIZE, false);
+    } catch {
+      /* ignore */
+    } finally {
+      setStationPatchBusyId(null);
+    }
   }
+
+  const fetchStationsPage = useCallback(
+    async (offset: number, append: boolean) => {
+      const qs = new URLSearchParams({
+        limit: String(LIST_PAGE_SIZE),
+        offset: String(offset),
+      });
+      if (filterOwnerId === "_none") qs.set("ownerId", "_none");
+      else if (filterOwnerId) qs.set("ownerId", filterOwnerId);
+      if (filterChargingStatus !== "all") qs.set("status", filterChargingStatus);
+      if (stationNameDebounced) qs.set("q", stationNameDebounced);
+      const r = await authedFetch(`/api/admin/stations?${qs}`);
+      const d = await r.json();
+      const batch = (d.stations ?? []) as ManageStationListRow[];
+      if (append) setStations((prev) => [...prev, ...batch]);
+      else setStations(batch);
+      setStationsHasMore(!!d.hasMore);
+      setStationsNextOffset(typeof d.nextOffset === "number" ? d.nextOffset : offset + batch.length);
+    },
+    [filterOwnerId, filterChargingStatus, stationNameDebounced],
+  );
 
   useEffect(() => {
     let alive = true;
+    setStationsPage(1);
     setStationsLoading(true);
     fetchStationsPage(0, false)
       .catch(() => {})
@@ -89,7 +177,7 @@ export default function AdminStationsPage() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [fetchStationsPage]);
 
   async function fetchOwnersPage(offset: number, append: boolean) {
     const qs = new URLSearchParams({
@@ -108,6 +196,7 @@ export default function AdminStationsPage() {
 
   useEffect(() => {
     if (!modalOpen) return;
+    setOwnerPage(1);
     fetchOwnersPage(0, false).catch(() => {});
   }, [modalOpen]);
 
@@ -143,7 +232,91 @@ export default function AdminStationsPage() {
         <h1 className="font-serif text-3xl font-extrabold tracking-tight sm:text-4xl">
           Trạm sạc
         </h1>
-        <p className="mt-2 text-[color:var(--muted-foreground)]">Danh sách trạm trong hệ thống.</p>
+        <PageBreadcrumb
+          className="mt-2"
+          items={[
+            { href: "/admin", label: "Tổng quan" },
+            { label: "Trạm" },
+          ]}
+        />
+      </div>
+
+      <div className="mt-6 flex flex-col gap-3">
+        <div className="flex justify-end md:hidden">
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            className="relative h-12 w-12 shrink-0 rounded-full p-0 shadow-[var(--shadow-soft)]"
+            aria-expanded={stationFiltersOpen}
+            aria-label={stationFiltersOpen ? "Đóng bộ lọc" : "Mở bộ lọc"}
+            onClick={() => setStationFiltersOpen((o) => !o)}
+          >
+            <Filter
+              className="pointer-events-none h-6 w-6 shrink-0"
+              strokeWidth={2.5}
+              aria-hidden
+              style={{ color: "var(--primary-foreground)" }}
+            />
+            {stationFiltersActive ? (
+              <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[color:var(--primary)] bg-amber-400" />
+            ) : null}
+          </Button>
+        </div>
+
+        <Card
+          className={[
+            "rounded-tl-[2.5rem] p-4 md:p-6",
+            !stationFiltersOpen ? "hidden md:block" : "",
+          ].join(" ")}
+        >
+          <CardTitle className="mb-3 hidden text-base md:block">Bộ lọc</CardTitle>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 md:mt-0">
+          <div className="grid gap-1.5">
+            <label className="text-xs font-semibold text-[color:var(--foreground)]">Chủ trạm</label>
+            <select
+              value={filterOwnerId}
+              onChange={(e) => setFilterOwnerId(e.target.value)}
+              className="h-11 w-full rounded-full border border-[color:var(--border)] bg-white/60 px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)]/30"
+            >
+              <option value="">Tất cả</option>
+              <option value="_none">Chưa gán chủ (admin)</option>
+              {ownerFilterOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {ownerLabel(o)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid gap-1.5">
+            <label className="text-xs font-semibold text-[color:var(--foreground)]">
+              Nhận sạc mới
+            </label>
+            <select
+              value={filterChargingStatus}
+              onChange={(e) =>
+                setFilterChargingStatus(e.target.value as "all" | "open" | "blocked")
+              }
+              className="h-11 w-full rounded-full border border-[color:var(--border)] bg-white/60 px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)]/30"
+            >
+              <option value="all">Tất cả</option>
+              <option value="open">Đang nhận sạc</option>
+              <option value="blocked">Không nhận sạc</option>
+            </select>
+          </div>
+          <div className="grid gap-1.5 sm:col-span-2 lg:col-span-2">
+            <label className="text-xs font-semibold text-[color:var(--foreground)]">
+              Tên hoặc mã trạm
+            </label>
+            <input
+              value={stationNameInput}
+              onChange={(e) => setStationNameInput(e.target.value)}
+              placeholder="Gõ để lọc (tên, slug)…"
+              className="h-11 w-full rounded-full border border-[color:var(--border)] bg-white/50 px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)]/30"
+            />
+          </div>
+        </div>
+        </Card>
       </div>
 
       <AddFab
@@ -153,91 +326,187 @@ export default function AdminStationsPage() {
         }}
       />
 
-      <div className="mt-8 grid gap-6 md:grid-cols-2">
-        {stationsLoading ? (
-          <p className="text-sm text-[color:var(--muted-foreground)] md:col-span-2">Đang tải…</p>
-        ) : stations.length === 0 ? (
-          <Card className="rounded-tl-[3rem] md:col-span-2">
-            <CardMuted>Chưa có trạm. Dùng nút Thêm ở góc dưới bên phải để tạo mới.</CardMuted>
-          </Card>
-        ) : (
-          stations.map((s) => (
-            <Card key={s.id} className="rounded-tl-[3rem]">
-              <CardTitle>{s.name}</CardTitle>
-              <div className="mt-4 grid gap-2 text-sm">
-                <div className="text-[color:var(--muted-foreground)]">
-                  Mã trạm: <span className="font-mono text-[color:var(--foreground)]">{s.slug}</span>
-                </div>
-                <div className="text-[color:var(--muted-foreground)]">
-                  ID trụ sạc (OCPP):{" "}
-                  <span className="font-mono text-[color:var(--foreground)]">
-                    {s.ocppChargePointId}
-                  </span>
-                </div>
-                <div className="text-[color:var(--muted-foreground)]">
-                  Chủ trạm:{" "}
-                  <span className="font-semibold text-[color:var(--foreground)]">
-                    {s.owner?.email ?? s.owner?.name ?? "—"}
-                  </span>
-                </div>
-                <div className="text-[color:var(--muted-foreground)]">
-                  Giá riêng:{" "}
-                  <span className="font-semibold text-[color:var(--foreground)]">
-                    {s.defaultPriceVndPerKwh != null ? formatViNumber(s.defaultPriceVndPerKwh) : "—"}
-                  </span>
-                  {s.defaultPriceVndPerKwh != null ? " VNĐ/kWh" : ""}
-                </div>
-                <div className="text-[color:var(--muted-foreground)]">
-                  Lần thấy gần nhất:{" "}
-                  <span className="text-[color:var(--foreground)]">
-                    {formatViDateTime(s.lastSeenAt)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <Button
-                  size="sm"
-                  onClick={async () => {
-                    const res = await authedFetch(`/api/admin/stations/${s.id}/qr`, {
-                      method: "POST",
-                    });
-                    const d = await res.json().catch(() => ({}));
-                    setQrByStationId((prev) => ({ ...prev, [s.id]: d.qrUrl ?? null }));
-                  }}
-                >
-                  Tạo link QR
-                </Button>
-                <CardMuted>
-                  {qrByStationId[s.id] ? (
-                    <button
+      {stationsLoading ? (
+        <p className="mt-6 text-sm text-[color:var(--muted-foreground)]">Đang tải…</p>
+      ) : stations.length === 0 ? (
+        <Card className="mt-6 rounded-tl-[3rem]">
+          <CardMuted>
+            {filterOwnerId || filterChargingStatus !== "all" || stationNameDebounced
+              ? "Không có kết quả."
+              : "Chưa có trạm."}
+          </CardMuted>
+        </Card>
+      ) : (
+        <>
+          <div className="mt-6 grid gap-3 sm:mt-8 sm:gap-4 md:hidden">
+            {stations.map((s) => (
+              <ManageStationCard
+                key={s.id}
+                station={s}
+                detailHref={`/admin/station/${s.id}`}
+                showOwner
+                footer={
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+                    {s.disabledAt ? (
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        type="button"
+                        disabled={stationPatchBusyId === s.id}
+                        onClick={() => void setStationChargingDisabled(s.id, false)}
+                      >
+                        Mở nhận sạc
+                      </Button>
+                    ) : stationRowChargingBlocked(s) ? (
+                      <span className="text-[11px] font-medium text-[color:var(--muted-foreground)]">
+                        Chủ trạm bị khóa
+                      </span>
+                    ) : (
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        type="button"
+                        disabled={stationPatchBusyId === s.id}
+                        onClick={() => void setStationChargingDisabled(s.id, true)}
+                      >
+                        Tạm dừng nhận sạc
+                      </Button>
+                    )}
+                    <Button
+                      size="xs"
+                      variant="outline"
                       type="button"
-                      className="rounded-full border border-[color:var(--border)]/60 bg-white/60 px-3 py-1.5 text-xs font-semibold text-[color:var(--foreground)] hover:bg-white active:scale-[0.99]"
                       onClick={async () => {
-                        const url = qrByStationId[s.id];
-                        if (!url) return;
-                        await navigator.clipboard.writeText(url);
+                        const res = await authedFetch(`/api/admin/stations/${s.id}/qr`, {
+                          method: "POST",
+                        });
+                        const d = await res.json().catch(() => ({}));
+                        setQrByStationId((prev) => ({ ...prev, [s.id]: d.qrUrl ?? null }));
                       }}
                     >
-                      Sao chép liên kết
-                    </button>
+                      Tạo link QR
+                    </Button>
+                    <div className="flex flex-col gap-1">
+                      {qrByStationId[s.id] ? (
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          type="button"
+                          onClick={() => void copyQrUrl(s.id, qrByStationId[s.id])}
+                        >
+                          Sao chép liên kết
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-[color:var(--muted-foreground)]">Chưa có link QR</span>
+                      )}
+                      {qrCopiedStationId === s.id ? (
+                        <span className="text-xs font-semibold text-[color:var(--secondary)]">
+                          Đã sao chép
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                }
+              />
+            ))}
+          </div>
+          <div className="mt-6 hidden md:mt-8 md:block">
+            <ManageStationsTable
+              stations={stations}
+              getDetailHref={(id) => `/admin/station/${id}`}
+              showOwner
+              actionsColumn={(s) => (
+                <div className="flex max-w-[9.5rem] flex-col items-start gap-1.5">
+                  {s.disabledAt ? (
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      type="button"
+                      disabled={stationPatchBusyId === s.id}
+                      onClick={() => void setStationChargingDisabled(s.id, false)}
+                    >
+                      Mở sạc
+                    </Button>
+                  ) : stationRowChargingBlocked(s) ? (
+                    <span className="text-[10px] font-medium text-[color:var(--muted-foreground)]">
+                      Chủ khóa
+                    </span>
                   ) : (
-                    <span>Chưa có link QR</span>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      type="button"
+                      disabled={stationPatchBusyId === s.id}
+                      onClick={() => void setStationChargingDisabled(s.id, true)}
+                    >
+                      Dừng sạc
+                    </Button>
                   )}
-                </CardMuted>
-              </div>
-            </Card>
-          ))
-        )}
-      </div>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    type="button"
+                    onClick={async () => {
+                      const res = await authedFetch(`/api/admin/stations/${s.id}/qr`, {
+                        method: "POST",
+                      });
+                      const d = await res.json().catch(() => ({}));
+                      setQrByStationId((prev) => ({ ...prev, [s.id]: d.qrUrl ?? null }));
+                    }}
+                  >
+                    Tạo QR
+                  </Button>
+                  {qrByStationId[s.id] ? (
+                    <>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        type="button"
+                        className="px-2"
+                        onClick={() => void copyQrUrl(s.id, qrByStationId[s.id])}
+                      >
+                        Sao chép link
+                      </Button>
+                      {qrCopiedStationId === s.id ? (
+                        <span
+                          className="text-[11px] font-semibold leading-snug text-[color:var(--secondary)]"
+                          role="status"
+                        >
+                          Đã sao chép
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span className="text-[11px] font-medium text-[color:var(--accent-foreground)]/80">
+                      Chưa có QR
+                    </span>
+                  )}
+                </div>
+              )}
+            />
+          </div>
+        </>
+      )}
       {!stationsLoading ? (
-        <LoadMoreButton
+        <ListPaginationFooter
+          itemCount={stations.length}
           hasMore={stationsHasMore}
-          loading={stationsLoadingMore}
+          loadingMore={stationsLoadingMore}
+          page={stationsPage}
           onLoadMore={async () => {
             setStationsLoadingMore(true);
             try {
               await fetchStationsPage(stationsNextOffset, true);
+            } finally {
+              setStationsLoadingMore(false);
+            }
+          }}
+          onGoToPage={async (p) => {
+            if (p < 1) return;
+            setStationsLoadingMore(true);
+            try {
+              await fetchStationsPage((p - 1) * LIST_PAGE_SIZE, false);
+              setStationsPage(p);
             } finally {
               setStationsLoadingMore(false);
             }
@@ -279,6 +548,7 @@ export default function AdminStationsPage() {
               if (!res.ok) throw new Error(d.error ?? "Tạo trạm thất bại");
 
               await fetchStationsPage(0, false);
+              setStationsPage(1);
               closeModal();
             } catch (err: unknown) {
               setCreateError(err instanceof Error ? err.message : "Tạo trạm thất bại");
@@ -398,16 +668,26 @@ export default function AdminStationsPage() {
                 )}
               </ul>
             ) : null}
-            <CardMutedLine className="mt-0">
-              Chỉ danh sách chủ trạm; gõ để lọc nhanh trong các mục đã tải.
-            </CardMutedLine>
-            <LoadMoreButton
+            <CardMutedLine className="mt-0">Lọc trong danh sách.</CardMutedLine>
+            <ListPaginationFooter
+              itemCount={ownerOptions.length}
               hasMore={ownerHasMore}
-              loading={ownerLoadingMore}
+              loadingMore={ownerLoadingMore}
+              page={ownerPage}
               onLoadMore={async () => {
                 setOwnerLoadingMore(true);
                 try {
                   await fetchOwnersPage(ownerNextOffset, true);
+                } finally {
+                  setOwnerLoadingMore(false);
+                }
+              }}
+              onGoToPage={async (p) => {
+                if (p < 1) return;
+                setOwnerLoadingMore(true);
+                try {
+                  await fetchOwnersPage((p - 1) * LIST_PAGE_SIZE, false);
+                  setOwnerPage(p);
                 } finally {
                   setOwnerLoadingMore(false);
                 }
@@ -425,7 +705,7 @@ export default function AdminStationsPage() {
               className="h-12 w-full rounded-full border border-[color:var(--border)] bg-white/50 px-5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)]/30"
               placeholder="3500"
             />
-            <CardMutedLine className="mt-0">Để trống sẽ dùng giá hệ thống.</CardMutedLine>
+            <CardMutedLine className="mt-0">Trống = giá hệ thống.</CardMutedLine>
           </div>
           <Button size="lg" type="submit" disabled={creating}>
             {creating ? "Đang tạo…" : "Tạo trạm"}

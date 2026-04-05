@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Card, CardMuted, CardTitle } from "@/components/ui/card";
 import { ClientGuard } from "@/components/auth/ClientGuard";
+import { PageBreadcrumb } from "@/components/ui/page-breadcrumb";
 import { authedFetch } from "@/lib/authClient";
 
 type Global = { priceVndPerKwh: number; updatedAt: string } | null;
@@ -35,9 +36,13 @@ export default function AdminPricingPage() {
       <h1 className="font-serif text-3xl sm:text-4xl font-extrabold tracking-tight">
         Cài đặt
       </h1>
-      <p className="mt-2 text-[color:var(--muted-foreground)]">
-        Thiết lập giá điện áp dụng cho hệ thống.
-      </p>
+      <PageBreadcrumb
+        className="mt-2"
+        items={[
+          { href: "/admin", label: "Tổng quan" },
+          { label: "Cài đặt" },
+        ]}
+      />
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
               <Card className="rounded-tl-[3rem]">
@@ -48,13 +53,11 @@ export default function AdminPricingPage() {
                     VNĐ/kWh
                   </span>
                 </div>
-                <CardMuted>Cập nhật lúc: {global?.updatedAt ?? "-"}</CardMuted>
+                <CardMuted>{global?.updatedAt ? `Cập nhật: ${global.updatedAt}` : "—"}</CardMuted>
               </Card>
 
               <Card className="rounded-tr-[3rem]">
                 <CardTitle>Cập nhật giá</CardTitle>
-                <CardMuted>Nhập giá mới (VNĐ/kWh) và lưu.</CardMuted>
-
                 <form
                   className="mt-6 grid gap-4"
                   onSubmit={async (e) => {
